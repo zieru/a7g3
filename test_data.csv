@@ -1,0 +1,11 @@
+﻿category,product,amount,region
+Electronics,Laptop,1500000,WEST
+Electronics,Phone,800000,EAST
+Electronics,Laptop,1200000,WEST
+Clothing,Shirt,150000,EAST
+Clothing,Pants,300000,WEST
+Clothing,Jacket,450000,EAST
+Food,Rice,50000,WEST
+Food,Bread,30000,EAST
+Food,Rice,60000,WEST
+Electronics,Phone,750000,EAST
