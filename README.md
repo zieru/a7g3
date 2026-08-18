@@ -26,22 +26,45 @@ go build -o g3a.exe .
 
 ## Usage
 
-```
+```bash
+g3a [alias | FILE] [options]
 g3a --input=FILE [options]
+```
 
-Options:
+### Alias Configuration (`.g3a.config`)
+
+You can define shortcuts/aliases for your data files in `~/.g3a.config` (e.g. `C:\Users\<user>\.g3a.config` on Windows or `/home/<user>/.g3a.config` on Linux) or `.g3a.config` in your current working directory:
+
+```text
+# ~/.g3a.config
+funneling /path/to/data.csv
+funnelingx /path/to/large_dataset.parquet
+sales C:\Users\user\Documents\sales.csv
+```
+
+Then query directly using the alias without `--input`:
+
+```bash
+g3a funneling --select="count(1) as total"
+g3a funnelingx --where="amount > 1000" --output=json
+```
+
+### Options
+
+```text
   --input        Input file path (.csv, .tsv, .parquet, .sqlite, .db)
   --select       SELECT expressions (default: *)
   --group-by     GROUP BY columns (comma-separated)
   --where        WHERE clause
   --order-by     ORDER BY clause
   --limit        Limit result rows (0 = no limit)
-  --output       Output format: table (default), csv, json
+  --output       Output format: table (default), csv, json, jsonl, toon
   --chunk-size   Rows per chunk for streaming (default: 100000)
   --no-header    Input CSV has no header row
   --delimiter    CSV delimiter character (auto-detect if empty)
   --table        SQLite table name (auto-detect if empty)
-  --verbose      Print SQL being executed
+  --pivot        Pivot column(s) into table headers
+  --verbose      Print debug info and SQL being executed
 ```
 
 ## Examples
