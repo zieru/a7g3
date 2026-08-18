@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -91,7 +92,25 @@ func run(args *cli.Args) error {
 		}
 	}
 
-	return output.Print(os.Stdout, result, string(args.Output), args.Verbose)
+	var outWriter io.Writer = os.Stdout
+	if args.OutFile != "" {
+		f, err := os.Create(args.OutFile)
+		if err != nil {
+			return fmt.Errorf("create output file %q: %w", args.OutFile, err)
+		}
+		defer f.Close()
+		outWriter = f
+	}
+
+	if err := output.Print(outWriter, result, string(args.Output), args.Verbose); err != nil {
+		return err
+	}
+
+	if args.OutFile != "" && args.Verbose {
+		fmt.Fprintf(os.Stderr, "[g3a] wrote output to %s\n", args.OutFile)
+	}
+
+	return nil
 }
 
 // splitTrimmed splits s by comma and trims spaces from each element.

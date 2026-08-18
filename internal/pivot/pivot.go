@@ -22,6 +22,7 @@ package pivot
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/a7g3/g3a/internal/engine"
@@ -156,8 +157,10 @@ func Apply(result *engine.Result, opts Options) (*engine.Result, error) {
 		data[rowKey][pivotKey] = val
 	}
 
-	// --- 3. Assemble output columns ----------------------------------------
+	// Sort pivot keys so hierarchically related headers group contiguously.
+	sort.Strings(pivotKeyOrder)
 
+	// --- 3. Assemble output columns ----------------------------------------
 	outCols := make([]string, 0, len(keyIdxs)+len(pivotKeyOrder))
 	for _, ki := range keyIdxs {
 		outCols = append(outCols, result.Columns[ki])

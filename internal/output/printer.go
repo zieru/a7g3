@@ -41,6 +41,8 @@ func Print(w io.Writer, result *engine.Result, format string, verbose bool) erro
 		return printJSONL(w, result)
 	case "toon":
 		return printTOON(w, result, verbose)
+	case "png", "image":
+		return RenderPNG(w, result)
 	default:
 		return printTable(w, result)
 	}

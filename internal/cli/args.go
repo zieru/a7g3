@@ -29,6 +29,8 @@ const (
 	OutputJSON  OutputFormat = "json"
 	OutputJSONL OutputFormat = "jsonl"
 	OutputTOON  OutputFormat = "toon"
+	OutputPNG   OutputFormat = "png"
+	OutputImage OutputFormat = "image"
 )
 
 // Args holds all parsed CLI arguments.
@@ -41,6 +43,7 @@ type Args struct {
 	OrderBy    string
 	Limit      int
 	Output     OutputFormat
+	OutFile    string // Output file path (e.g. report.png or data.csv)
 	ChunkSize  int
 	NoHeader   bool
 	Delimiter  string
@@ -70,7 +73,9 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 	fs.StringVar(&a.Where, "where", "", "WHERE clause (e.g. \"amount > 100\")")
 	fs.StringVar(&a.OrderBy, "order-by", "", "ORDER BY clause (e.g. \"total DESC\")")
 	fs.IntVar(&a.Limit, "limit", 0, "Limit number of result rows (0 = no limit)")
-	fs.StringVar((*string)(&a.Output), "output", "table", "Output format: table, csv, json, jsonl, toon (toon=token-efficient for LLM, jsonl=streaming JSON Lines)")
+	fs.StringVar((*string)(&a.Output), "output", "table", "Output format: table, csv, json, jsonl, toon, png/image")
+	fs.StringVar(&a.OutFile, "out-file", "", "Output file path (e.g. table.png or out.csv)")
+	fs.StringVar(&a.OutFile, "out", "", "Alias for --out-file")
 	fs.IntVar(&a.ChunkSize, "chunk-size", 100_000, "Rows per chunk for CSV/Parquet streaming")
 	fs.BoolVar(&a.NoHeader, "no-header", false, "Input CSV has no header row")
 	fs.StringVar(&a.Delimiter, "delimiter", "", "CSV delimiter character (auto-detect if empty)")
@@ -90,6 +95,23 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 			os.Exit(0)
 		}
 		return nil, err
+	}
+
+	// Auto-detect output format from --out-file extension if default output is table
+	if a.OutFile != "" && a.Output == OutputTable {
+		outExt := strings.ToLower(filepath.Ext(a.OutFile))
+		switch outExt {
+		case ".png":
+			a.Output = OutputPNG
+		case ".csv":
+			a.Output = OutputCSV
+		case ".json":
+			a.Output = OutputJSON
+		case ".jsonl":
+			a.Output = OutputJSONL
+		case ".toon":
+			a.Output = OutputTOON
+		}
 	}
 
 	// Resolve input file from positional alias or direct filepath if not specified via --input
@@ -122,6 +144,8 @@ func splitFlagsAndPositional(args []string) ([]string, []string) {
 		"order-by":   true,
 		"limit":      true,
 		"output":     true,
+		"out-file":   true,
+		"out":        true,
 		"chunk-size": true,
 		"delimiter":  true,
 		"table":      true,
@@ -197,10 +221,10 @@ func (a *Args) validate() error {
 	}
 
 	switch a.Output {
-	case OutputTable, OutputCSV, OutputJSON, OutputJSONL, OutputTOON:
+	case OutputTable, OutputCSV, OutputJSON, OutputJSONL, OutputTOON, OutputPNG, OutputImage:
 		// valid
 	default:
-		return fmt.Errorf("invalid --output value %q (valid: table, csv, json, jsonl, toon)", a.Output)
+		return fmt.Errorf("invalid --output value %q (valid: table, csv, json, jsonl, toon, png, image)", a.Output)
 	}
 
 	if a.ChunkSize <= 0 {

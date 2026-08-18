@@ -58,12 +58,15 @@ g3a funnelingx --where="amount > 1000" --output=json
   --where        WHERE clause
   --order-by     ORDER BY clause
   --limit        Limit result rows (0 = no limit)
-  --output       Output format: table (default), csv, json, jsonl, toon
+  --output       Output format: table (default), csv, json, jsonl, toon, png, image
+  --out-file     Output file path (e.g. report.png, data.csv)
   --chunk-size   Rows per chunk for streaming (default: 100000)
   --no-header    Input CSV has no header row
   --delimiter    CSV delimiter character (auto-detect if empty)
   --table        SQLite table name (auto-detect if empty)
-  --pivot        Pivot column(s) into table headers
+  --pivot        Pivot column(s) into table headers (e.g. month or year,month)
+  --pivot-fill   Fill value for missing pivot cells (default "0")
+  --pivot-sep    Separator for multi-column pivot headers (default "/")
   --verbose      Print debug info and SQL being executed
 ```
 
