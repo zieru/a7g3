@@ -19,21 +19,29 @@ import (
 )
 
 var (
-	colorHeaderBg     = color.RGBA{R: 225, G: 25, B: 49, A: 255}   // Telkomsel Primary Red (#E11931)
-	colorHeaderSubBg  = color.RGBA{R: 152, G: 18, B: 35, A: 255}   // Telkomsel Deep Burgundy Sub (#981223)
-	colorHeaderText   = color.RGBA{R: 255, G: 255, B: 255, A: 255} // Pure White
-	colorRowBgEven    = color.RGBA{R: 255, G: 255, B: 255, A: 255} // Pure White
-	colorRowBgOdd     = color.RGBA{R: 253, G: 246, B: 247, A: 255} // Subtle Rose/Red-tinted Row
-	colorBorder       = color.RGBA{R: 229, G: 231, B: 235, A: 255} // Clean border gridline (#E5E7EB)
-	colorHeaderBorder = color.RGBA{R: 255, G: 255, B: 255, A: 140} // Crisp Header separator
-	colorCellText     = color.RGBA{R: 31, G: 41, B: 55, A: 255}    // Dark Slate text (#1F2937)
-	colorFooterBg     = color.RGBA{R: 248, G: 249, B: 251, A: 255} // Subtle Footer bar
-	colorFooterText   = color.RGBA{R: 107, G: 114, B: 128, A: 255} // Muted text (#6B7280)
+	// Custom Telkomsel / Dashboard colors
+	colorHeaderDarkGray = color.RGBA{R: 89, G: 89, B: 89, A: 255}
+	colorHeaderBlue     = color.RGBA{R: 11, G: 58, B: 130, A: 255}
+	colorHeaderRed      = color.RGBA{R: 225, G: 25, B: 49, A: 255}
+	colorHeaderBlack    = color.RGBA{R: 0, G: 0, B: 0, A: 255}
+
+	colorHeaderText   = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	colorRowBgEven    = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	colorRowBgOdd     = color.RGBA{R: 243, G: 244, B: 246, A: 255} // Light gray odd row
+	colorRowRegion    = color.RGBA{R: 200, G: 200, B: 200, A: 255} // Light/Mid gray for regions
+	colorRowTotal     = color.RGBA{R: 0, G: 0, B: 0, A: 255}       // Black
+	colorRowBlue      = color.RGBA{R: 11, G: 58, B: 130, A: 255}   // Blue for %Cont
+	colorCellTotalCol = color.RGBA{R: 100, G: 100, B: 100, A: 255} // Subtotal col background
+
+	colorBorder       = color.RGBA{R: 229, G: 231, B: 235, A: 255}
+	colorHeaderBorder = color.RGBA{R: 255, G: 255, B: 255, A: 140}
+	colorCellText     = color.RGBA{R: 31, G: 41, B: 55, A: 255}
+	colorFooterBg     = color.RGBA{R: 248, G: 249, B: 251, A: 255}
+	colorFooterText   = color.RGBA{R: 107, G: 114, B: 128, A: 255}
 	colorCardBg       = color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	colorOuterBg      = color.RGBA{R: 243, G: 244, B: 246, A: 255} // Modern Neutral Canvas (#F3F4F6)
+	colorOuterBg      = color.RGBA{R: 243, G: 244, B: 246, A: 255}
 )
 
-// RenderPNG renders the result as an Excel-styled table image (PNG).
 func RenderPNG(w io.Writer, result *engine.Result) error {
 	img, err := DrawTableImage(result)
 	if err != nil {
@@ -42,74 +50,68 @@ func RenderPNG(w io.Writer, result *engine.Result) error {
 	return png.Encode(w, img)
 }
 
-// DrawTableImage generates an *image.RGBA representing the result table.
-func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
-	regFont, err := opentype.Parse(goregular.TTF)
-	if err != nil {
-		return nil, fmt.Errorf("parse regular font: %w", err)
+func getHeaderColor(text string) color.Color {
+	t := strings.ToLower(text)
+	if strings.Contains(t, "%progress") || strings.Contains(t, "%cont") {
+		return colorHeaderBlue
 	}
-	boldFont, err := opentype.Parse(gobold.TTF)
-	if err != nil {
-		return nil, fmt.Errorf("parse bold font: %w", err)
+	if strings.HasPrefix(t, "total ") {
+		return colorHeaderRed
 	}
+	if t == "grand total" {
+		return colorHeaderBlack
+	}
+	return colorHeaderDarkGray
+}
 
-	const dpi = 144.0 // High DPI / Retina for crystal clear text on mobile
+func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
+	regFont, _ := opentype.Parse(goregular.TTF)
+	boldFont, _ := opentype.Parse(gobold.TTF)
+
+	const dpi = 144.0
 	fontScale := dpi / 72.0
 
-	faceBody, err := opentype.NewFace(regFont, &opentype.FaceOptions{
-		Size:    13,
-		DPI:     dpi,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer faceBody.Close()
-
-	faceHeader, err := opentype.NewFace(boldFont, &opentype.FaceOptions{
-		Size:    13,
-		DPI:     dpi,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer faceHeader.Close()
-
-	faceFooter, err := opentype.NewFace(regFont, &opentype.FaceOptions{
-		Size:    11,
-		DPI:     dpi,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer faceFooter.Close()
+	faceBody, _ := opentype.NewFace(regFont, &opentype.FaceOptions{Size: 13, DPI: dpi, Hinting: font.HintingFull})
+	faceBodyBold, _ := opentype.NewFace(boldFont, &opentype.FaceOptions{Size: 13, DPI: dpi, Hinting: font.HintingFull})
+	faceHeader, _ := opentype.NewFace(boldFont, &opentype.FaceOptions{Size: 13, DPI: dpi, Hinting: font.HintingFull})
+	faceFooter, _ := opentype.NewFace(regFont, &opentype.FaceOptions{Size: 11, DPI: dpi, Hinting: font.HintingFull})
 
 	numCols := len(result.Columns)
 	if numCols == 0 {
 		return drawEmptyState(faceBody, fontScale), nil
 	}
 
-	// 1. Detect multi-level headers (e.g. "2024/Jan" or "WEST/Laptop")
-	isMultiLevel := false
+	// Detect up to 3 levels of headers
+	numHeaderRows := 1
 	topHeaders := make([]string, numCols)
+	midHeaders := make([]string, numCols)
 	subHeaders := make([]string, numCols)
 
 	for i, col := range result.Columns {
-		if idx := strings.Index(col, "/"); idx != -1 {
-			isMultiLevel = true
-			topHeaders[i] = col[:idx]
-			subHeaders[i] = col[idx+1:]
+		parts := strings.Split(col, "/")
+		if len(parts) == 3 {
+			if numHeaderRows < 3 {
+				numHeaderRows = 3
+			}
+			topHeaders[i] = parts[0]
+			midHeaders[i] = parts[1]
+			subHeaders[i] = parts[2]
+		} else if len(parts) == 2 {
+			if numHeaderRows < 2 {
+				numHeaderRows = 2
+			}
+			topHeaders[i] = parts[0]
+			midHeaders[i] = parts[1]
+			subHeaders[i] = ""
 		} else {
 			topHeaders[i] = col
+			midHeaders[i] = ""
 			subHeaders[i] = ""
 		}
 	}
 
-	// 2. Measure column widths based on cell and header contents
 	colWidths := make([]int, numCols)
-	paddingX := int(16 * fontScale) // 16px padding on each side
+	paddingX := int(16 * fontScale)
 	rowHeight := int(32 * fontScale)
 	headerRowHeight := int(34 * fontScale)
 	footerHeight := int(28 * fontScale)
@@ -118,20 +120,16 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 	// Measure headers
 	for i := 0; i < numCols; i++ {
 		wTop := font.MeasureString(faceHeader, topHeaders[i]).Ceil()
-		wSub := 0
-		if isMultiLevel && subHeaders[i] != "" {
-			wSub = font.MeasureString(faceHeader, subHeaders[i]).Ceil()
-		}
+		wMid := font.MeasureString(faceHeader, midHeaders[i]).Ceil()
+		wSub := font.MeasureString(faceHeader, subHeaders[i]).Ceil()
 		maxW := wTop
-		if wSub > maxW {
-			maxW = wSub
-		}
+		if wMid > maxW { maxW = wMid }
+		if wSub > maxW { maxW = wSub }
 		if maxW > colWidths[i] {
 			colWidths[i] = maxW
 		}
 	}
 
-	// Measure data rows
 	isNumericCol := make([]bool, numCols)
 	for i := range isNumericCol {
 		isNumericCol[i] = true
@@ -146,14 +144,13 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 			if isNumericCol[i] && val != "" && val != "0" && !isNumeric(val) {
 				isNumericCol[i] = false
 			}
-			w := font.MeasureString(faceBody, val).Ceil()
+			w := font.MeasureString(faceBodyBold, val).Ceil() // measure with bold to be safe
 			if w > colWidths[i] {
 				colWidths[i] = w
 			}
 		}
 	}
 
-	// Add padding to col widths & ensure minimum width
 	minColWidth := int(70 * fontScale)
 	for i := range colWidths {
 		colWidths[i] += paddingX * 2
@@ -162,15 +159,9 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 		}
 	}
 
-	// 3. Compute total dimensions
 	tableWidth := 0
 	for _, w := range colWidths {
 		tableWidth += w
-	}
-
-	numHeaderRows := 1
-	if isMultiLevel {
-		numHeaderRows = 2
 	}
 	tableHeight := (numHeaderRows * headerRowHeight) + (len(result.Rows) * rowHeight) + footerHeight
 
@@ -178,16 +169,12 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 	canvasHeight := tableHeight + (margin * 2)
 
 	img := image.NewRGBA(image.Rect(0, 0, canvasWidth, canvasHeight))
-
-	// Fill background
 	fillRect(img, 0, 0, canvasWidth, canvasHeight, colorOuterBg)
 
-	// Draw table container card with rounded-like fill
 	tableX := margin
 	tableY := margin
 	fillRect(img, tableX, tableY, tableWidth, tableHeight, colorCardBg)
 
-	// 4. Draw Header
 	colXOffsets := make([]int, numCols+1)
 	currX := tableX
 	for i := 0; i < numCols; i++ {
@@ -196,89 +183,146 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 	}
 	colXOffsets[numCols] = currX
 
-	if !isMultiLevel {
-		// Single header row
-		fillRect(img, tableX, tableY, tableWidth, headerRowHeight, colorHeaderBg)
-		for i, col := range result.Columns {
-			cx := colXOffsets[i]
-			cw := colWidths[i]
-			// Border separator
-			if i > 0 {
-				drawVLine(img, cx, tableY, headerRowHeight, colorHeaderBorder)
-			}
-			drawTextInCell(img, faceHeader, col, cx, tableY, cw, headerRowHeight, paddingX, isNumericCol[i], colorHeaderText)
+	// Draw Headers
+	for i := 0; i < numCols; {
+		topName := topHeaders[i]
+		startCol := i
+		for i < numCols && topHeaders[i] == topName {
+			i++
 		}
-	} else {
-		// Multi-level Header
-		fillRect(img, tableX, tableY, tableWidth, headerRowHeight*2, colorHeaderBg)
-		// Sub-header bar darker background
-		fillRect(img, tableX, tableY+headerRowHeight, tableWidth, headerRowHeight, colorHeaderSubBg)
-
-		// Draw Level 1 (Top headers with merged spans)
-		i := 0
-		for i < numCols {
-			topName := topHeaders[i]
-			startCol := i
-			// Find span
-			for i < numCols && topHeaders[i] == topName {
-				i++
-			}
-			endCol := i - 1
-
-			spanX := colXOffsets[startCol]
-			spanW := colXOffsets[endCol+1] - spanX
-
-			if subHeaders[startCol] == "" && startCol == endCol {
-				// Vertical span (Rowspan 2)
-				fillRect(img, spanX, tableY, spanW, headerRowHeight*2, colorHeaderBg)
-				drawTextInCell(img, faceHeader, topName, spanX, tableY, spanW, headerRowHeight*2, paddingX, false, colorHeaderText)
-			} else {
-				// Horizontal span (Colspan)
-				drawTextCentered(img, faceHeader, topName, spanX, tableY, spanW, headerRowHeight, colorHeaderText)
-				// Horizontal border below top level
-				drawHLine(img, spanX, tableY+headerRowHeight, spanW, colorHeaderBorder)
-
-				// Draw sub headers
-				for c := startCol; c <= endCol; c++ {
-					subX := colXOffsets[c]
-					subW := colWidths[c]
-					if c > startCol {
-						drawVLine(img, subX, tableY+headerRowHeight, headerRowHeight, colorHeaderBorder)
+		endCol := i - 1
+		spanX := colXOffsets[startCol]
+		spanW := colXOffsets[endCol+1] - spanX
+		
+		bgClr := getHeaderColor(topName)
+		
+		if midHeaders[startCol] == "" && subHeaders[startCol] == "" && startCol == endCol {
+			// Rowspan full height
+			fillRect(img, spanX, tableY, spanW, headerRowHeight*numHeaderRows, bgClr)
+			drawTextInCell(img, faceHeader, topName, spanX, tableY, spanW, headerRowHeight*numHeaderRows, paddingX, false, colorHeaderText)
+		} else {
+			// Top level
+			fillRect(img, spanX, tableY, spanW, headerRowHeight, bgClr)
+			drawTextCentered(img, faceHeader, topName, spanX, tableY, spanW, headerRowHeight, colorHeaderText)
+			
+			// Mid and Sub levels
+			for j := startCol; j <= endCol; {
+				midName := midHeaders[j]
+				midStart := j
+				for j <= endCol && midHeaders[j] == midName {
+					j++
+				}
+				midEnd := j - 1
+				midSpanX := colXOffsets[midStart]
+				midSpanW := colXOffsets[midEnd+1] - midSpanX
+				
+				midBgClr := bgClr
+				if strings.Contains(strings.ToLower(midName), "total") {
+					midBgClr = colorCellTotalCol
+				}
+				
+				if subHeaders[midStart] == "" && midStart == midEnd {
+					// Mid spans remaining height
+					remH := headerRowHeight * (numHeaderRows - 1)
+					fillRect(img, midSpanX, tableY+headerRowHeight, midSpanW, remH, midBgClr)
+					drawHLine(img, midSpanX, tableY+headerRowHeight, midSpanW, colorHeaderBorder)
+					drawTextInCell(img, faceHeader, midName, midSpanX, tableY+headerRowHeight, midSpanW, remH, paddingX, isNumericCol[midStart], colorHeaderText)
+				} else {
+					// Mid level
+					fillRect(img, midSpanX, tableY+headerRowHeight, midSpanW, headerRowHeight, midBgClr)
+					drawHLine(img, midSpanX, tableY+headerRowHeight, midSpanW, colorHeaderBorder)
+					drawTextCentered(img, faceHeader, midName, midSpanX, tableY+headerRowHeight, midSpanW, headerRowHeight, colorHeaderText)
+					
+					// Sub level
+					if numHeaderRows == 3 {
+						for k := midStart; k <= midEnd; k++ {
+							subX := colXOffsets[k]
+							subW := colWidths[k]
+							
+							subBgClr := bgClr
+							if strings.Contains(strings.ToLower(subHeaders[k]), "total") || strings.Contains(strings.ToLower(midName), "total") {
+								subBgClr = colorCellTotalCol
+							}
+							
+							fillRect(img, subX, tableY+headerRowHeight*2, subW, headerRowHeight, subBgClr)
+							drawHLine(img, subX, tableY+headerRowHeight*2, subW, colorHeaderBorder)
+							if k > midStart {
+								drawVLine(img, subX, tableY+headerRowHeight*2, headerRowHeight, colorHeaderBorder)
+							}
+							drawTextInCell(img, faceHeader, subHeaders[k], subX, tableY+headerRowHeight*2, subW, headerRowHeight, paddingX, isNumericCol[k], colorHeaderText)
+						}
 					}
-					drawTextInCell(img, faceHeader, subHeaders[c], subX, tableY+headerRowHeight, subW, headerRowHeight, paddingX, isNumericCol[c], colorHeaderText)
+				}
+				if midStart > startCol {
+					drawVLine(img, midSpanX, tableY+headerRowHeight, headerRowHeight*(numHeaderRows-1), colorHeaderBorder)
 				}
 			}
-
-			if startCol > 0 {
-				drawVLine(img, spanX, tableY, headerRowHeight*2, colorHeaderBorder)
-			}
+		}
+		if startCol > 0 {
+			drawVLine(img, spanX, tableY, headerRowHeight*numHeaderRows, colorHeaderBorder)
 		}
 	}
 
-	// 5. Draw Rows (Zebra stripes & cell text)
+	// 5. Draw Rows
 	dataStartY := tableY + (numHeaderRows * headerRowHeight)
 	for r, row := range result.Rows {
 		rowY := dataStartY + (r * rowHeight)
-		rowBg := colorRowBgEven
-		if r%2 == 1 {
-			rowBg = colorRowBgOdd
+		
+		isGrandTotal := len(row) > 0 && row[0] == "Grand Total"
+		isContByMonth := len(row) > 0 && strings.Contains(row[0], "%Cont")
+		isRegion := len(row) > 0 && !strings.HasPrefix(row[0], " ") && !isGrandTotal && !isContByMonth
+		
+		var rowBg color.Color = colorRowBgEven
+		if r%2 == 1 { rowBg = colorRowBgOdd }
+		
+		textColor := colorCellText
+		currFace := faceBody
+		
+		if isGrandTotal {
+			rowBg = colorRowTotal
+			textColor = colorHeaderText
+			currFace = faceBodyBold
+		} else if isContByMonth {
+			rowBg = colorRowBlue
+			textColor = colorHeaderText
+			currFace = faceBodyBold
+		} else if isRegion {
+			rowBg = colorRowRegion
+			textColor = colorCellText
+			currFace = faceBodyBold
 		}
-		fillRect(img, tableX, rowY, tableWidth, rowHeight, rowBg)
 
-		// Draw horizontal cell border
+		fillRect(img, tableX, rowY, tableWidth, rowHeight, rowBg)
 		drawHLine(img, tableX, rowY, tableWidth, colorBorder)
 
 		for c := 0; c < numCols; c++ {
 			cx := colXOffsets[c]
 			cw := colWidths[c]
+			
+			// Subtotal columns in dark gray
+			if !isGrandTotal && !isContByMonth && !isRegion {
+				if strings.Contains(strings.ToLower(midHeaders[c]), "total") || strings.Contains(strings.ToLower(subHeaders[c]), "total") {
+					fillRect(img, cx, rowY, cw, rowHeight, colorCellTotalCol)
+					if textColor == colorCellText {
+						// draw text white inside total cols
+						drawTextInCell(img, currFace, formatCellValue(row[c]), cx, rowY, cw, rowHeight, paddingX, isNumericCol[c], colorHeaderText)
+						if c > 0 { drawVLine(img, cx, rowY, rowHeight, colorBorder) }
+						continue
+					}
+				}
+			}
+
 			if c > 0 {
 				drawVLine(img, cx, rowY, rowHeight, colorBorder)
 			}
 			val := ""
 			if c < len(row) {
 				val = formatCellValue(row[c])
+				if c == 0 && !isRegion && !isGrandTotal && !isContByMonth {
+					val = strings.TrimSpace(val) // remove space prefix for display
+				}
 			}
-			drawTextInCell(img, faceBody, val, cx, rowY, cw, rowHeight, paddingX, isNumericCol[c], colorCellText)
+			drawTextInCell(img, currFace, val, cx, rowY, cw, rowHeight, paddingX, isNumericCol[c], textColor)
 		}
 	}
 
@@ -290,7 +334,6 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 	footerText := fmt.Sprintf(" %d row(s) • %v", result.RowCount, result.Duration.Round(1_000_000))
 	drawTextInCell(img, faceFooter, footerText, tableX, footerY, tableWidth, footerHeight, paddingX, false, colorFooterText)
 
-	// Outer Table Border
 	drawRectBorder(img, tableX, tableY, tableWidth, tableHeight, colorBorder)
 
 	return img, nil
@@ -335,10 +378,7 @@ func formatCellValue(s string) string {
 }
 
 func isNumeric(s string) bool {
-	if s == "" || s == "NULL" {
-		return false
-	}
-	// Quick check
+	if s == "" || s == "NULL" { return false }
 	hasDigit := false
 	for _, r := range s {
 		if r >= '0' && r <= '9' {
@@ -351,36 +391,21 @@ func isNumeric(s string) bool {
 }
 
 func drawTextInCell(dst *image.RGBA, f font.Face, text string, x, y, w, h, padX int, alignRight bool, clr color.Color) {
-	if text == "" {
-		return
-	}
+	if text == "" { return }
 	bounds, _ := font.BoundString(f, text)
 	textW := (bounds.Max.X - bounds.Min.X).Ceil()
 	fontHeight := f.Metrics().Ascent.Ceil()
 
-	// Vertically center
 	posY := y + (h+fontHeight)/2 - int(2*(f.Metrics().Descent.Ceil()/3))
+	posX := x + padX
+	if alignRight { posX = x + w - padX - textW }
 
-	var posX int
-	if alignRight {
-		posX = x + w - padX - textW
-	} else {
-		posX = x + padX
-	}
-
-	d := &font.Drawer{
-		Dst:  dst,
-		Src:  image.NewUniform(clr),
-		Face: f,
-		Dot:  fixed.Point26_6{X: fixed.I(posX), Y: fixed.I(posY)},
-	}
+	d := &font.Drawer{Dst: dst, Src: image.NewUniform(clr), Face: f, Dot: fixed.Point26_6{X: fixed.I(posX), Y: fixed.I(posY)}}
 	d.DrawString(text)
 }
 
 func drawTextCentered(dst *image.RGBA, f font.Face, text string, x, y, w, h int, clr color.Color) {
-	if text == "" {
-		return
-	}
+	if text == "" { return }
 	bounds, _ := font.BoundString(f, text)
 	textW := (bounds.Max.X - bounds.Min.X).Ceil()
 	fontHeight := f.Metrics().Ascent.Ceil()
@@ -388,12 +413,7 @@ func drawTextCentered(dst *image.RGBA, f font.Face, text string, x, y, w, h int,
 	posY := y + (h+fontHeight)/2 - int(2*(f.Metrics().Descent.Ceil()/3))
 	posX := x + (w-textW)/2
 
-	d := &font.Drawer{
-		Dst:  dst,
-		Src:  image.NewUniform(clr),
-		Face: f,
-		Dot:  fixed.Point26_6{X: fixed.I(posX), Y: fixed.I(posY)},
-	}
+	d := &font.Drawer{Dst: dst, Src: image.NewUniform(clr), Face: f, Dot: fixed.Point26_6{X: fixed.I(posX), Y: fixed.I(posY)}}
 	d.DrawString(text)
 }
 
@@ -401,35 +421,23 @@ func fillRect(dst *image.RGBA, x, y, w, h int, clr color.Color) {
 	draw.Draw(dst, image.Rect(x, y, x+w, y+h), &image.Uniform{C: clr}, image.Point{}, draw.Src)
 }
 
-func drawHLine(dst *image.RGBA, x, y, w int, clr color.Color) {
-	fillRect(dst, x, y, w, 1, clr)
-}
-
-func drawVLine(dst *image.RGBA, x, y, h int, clr color.Color) {
-	fillRect(dst, x, y, 1, h, clr)
-}
-
+func drawHLine(dst *image.RGBA, x, y, w int, clr color.Color) { fillRect(dst, x, y, w, 1, clr) }
+func drawVLine(dst *image.RGBA, x, y, h int, clr color.Color) { fillRect(dst, x, y, 1, h, clr) }
 func drawRectBorder(dst *image.RGBA, x, y, w, h int, clr color.Color) {
-	drawHLine(dst, x, y, w, clr)
-	drawHLine(dst, x, y+h-1, w, clr)
-	drawVLine(dst, x, y, h, clr)
-	drawVLine(dst, x+w-1, y, h, clr)
+	drawHLine(dst, x, y, w, clr); drawHLine(dst, x, y+h-1, w, clr)
+	drawVLine(dst, x, y, h, clr); drawVLine(dst, x+w-1, y, h, clr)
 }
 
 func drawEmptyState(f font.Face, fontScale float64) *image.RGBA {
-	w := int(300 * fontScale)
-	h := int(100 * fontScale)
+	w, h := int(300*fontScale), int(100*fontScale)
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	fillRect(img, 0, 0, w, h, colorOuterBg)
 	drawTextCentered(img, f, "No data available", 0, 0, w, h, colorCellText)
 	return img
 }
 
-// RenderPNGBytes returns the PNG bytes in memory.
 func RenderPNGBytes(result *engine.Result) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := RenderPNG(&buf, result); err != nil {
-		return nil, err
-	}
+	if err := RenderPNG(&buf, result); err != nil { return nil, err }
 	return buf.Bytes(), nil
 }
