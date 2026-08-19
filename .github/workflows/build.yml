@@ -9,18 +9,13 @@ permissions:
   contents: write
 
 jobs:
-  # ── Linux build inside Debian 11 (GLIBC 2.31) ──────────────────────
+  # ── Linux build inside Manylinux 2.28 (GLIBC 2.28 / GCC 14) ────────
   build-linux:
-    name: Build (linux-amd64) [GLIBC 2.31]
+    name: Build (linux-amd64) [GLIBC 2.28]
     runs-on: ubuntu-latest
     container:
-      image: debian:bullseye
+      image: quay.io/pypa/manylinux_2_28_x86_64
     steps:
-      - name: Install build dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            build-essential git ca-certificates curl
 
       - name: Install Go
         run: |
