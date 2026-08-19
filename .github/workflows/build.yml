@@ -31,6 +31,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Go module cache
         uses: actions/cache@v4
         with:
@@ -41,12 +44,12 @@ jobs:
           restore-keys: ${{ runner.os }}-go-linux-
 
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v -buildvcs=false ./...
 
       - name: Build binary
         run: |
           mkdir -p dist
-          CGO_ENABLED=1 go build -v -ldflags="-s -w" \
+          CGO_ENABLED=1 go build -v -buildvcs=false -ldflags="-s -w" \
             -o dist/g3a-linux-amd64 .
 
       - name: Verify GLIBC compatibility
@@ -72,6 +75,7 @@ jobs:
   # ── Windows build (native runner) ───────────────────────────────────
   build-windows:
     name: Build (windows-amd64)
+    needs: [build-linux]
     runs-on: windows-latest
     steps:
       - name: Checkout code
