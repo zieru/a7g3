@@ -157,7 +157,7 @@ func buildQuery(opts QueryOptions) (string, error) {
 			inputPath = filepath.ToSlash(inputPath)
 		}
 		escaped := strings.ReplaceAll(inputPath, "'", "''")
-		from = fmt.Sprintf("read_parquet('%s')", escaped)
+		from = fmt.Sprintf("read_parquet('%s', union_by_name=true)", escaped)
 	case "sqlite":
 		from = buildSQLiteSource(opts)
 	default:
