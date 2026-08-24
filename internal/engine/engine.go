@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -149,7 +150,13 @@ func buildQuery(opts QueryOptions) (string, error) {
 	case "csv":
 		from = buildCSVSource(opts)
 	case "parquet":
-		escaped := strings.ReplaceAll(opts.InputPath, "'", "''")
+		inputPath := opts.InputPath
+		if stat, err := os.Stat(inputPath); err == nil && stat.IsDir() {
+			inputPath = filepath.ToSlash(filepath.Join(inputPath, "*.parquet"))
+		} else {
+			inputPath = filepath.ToSlash(inputPath)
+		}
+		escaped := strings.ReplaceAll(inputPath, "'", "''")
 		from = fmt.Sprintf("read_parquet('%s')", escaped)
 	case "sqlite":
 		from = buildSQLiteSource(opts)

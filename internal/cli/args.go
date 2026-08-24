@@ -201,23 +201,41 @@ func (a *Args) validate() error {
 		return errors.New("--input is required")
 	}
 
-	if _, err := os.Stat(a.Input); err != nil {
-		return fmt.Errorf("cannot access input file %q: %w", a.Input, err)
-	}
-
-	ext := strings.ToLower(filepath.Ext(a.Input))
-	switch ext {
-	case ".csv", ".tsv", ".txt":
-		a.Format = FormatCSV
-		if a.Delimiter == "" && ext == ".tsv" {
-			a.Delimiter = "\t"
+	// If input contains wildcards (* or ?), handle as glob pattern
+	if strings.ContainsAny(a.Input, "*?") {
+		ext := strings.ToLower(filepath.Ext(a.Input))
+		if ext == ".parquet" || strings.Contains(a.Input, ".parquet") {
+			a.Format = FormatParquet
+		} else if ext == ".csv" || strings.Contains(a.Input, ".csv") {
+			a.Format = FormatCSV
+		} else {
+			a.Format = FormatParquet
 		}
-	case ".parquet":
-		a.Format = FormatParquet
-	case ".sqlite", ".db", ".sqlite3":
-		a.Format = FormatSQLite
-	default:
-		return fmt.Errorf("unsupported file extension %q (supported: .csv, .tsv, .parquet, .sqlite, .db)", ext)
+	} else {
+		stat, err := os.Stat(a.Input)
+		if err != nil {
+			return fmt.Errorf("cannot access input file or directory %q: %w", a.Input, err)
+		}
+
+		if stat.IsDir() {
+			// If input is a directory, default to Parquet directory scanning
+			a.Format = FormatParquet
+		} else {
+			ext := strings.ToLower(filepath.Ext(a.Input))
+			switch ext {
+			case ".csv", ".tsv", ".txt":
+				a.Format = FormatCSV
+				if a.Delimiter == "" && ext == ".tsv" {
+					a.Delimiter = "\t"
+				}
+			case ".parquet":
+				a.Format = FormatParquet
+			case ".sqlite", ".db", ".sqlite3":
+				a.Format = FormatSQLite
+			default:
+				return fmt.Errorf("unsupported file extension %q (supported: .csv, .tsv, .parquet, .sqlite, .db)", ext)
+			}
+		}
 	}
 
 	switch a.Output {
