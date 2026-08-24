@@ -94,3 +94,24 @@ func TestPrintJSONVerbose(t *testing.T) {
 	}
 }
 
+func TestPrintJSON_DateStringsPreserved(t *testing.T) {
+	r := &engine.Result{
+		Columns:  []string{"periode", "total_visits"},
+		Rows:     [][]string{{"2026-08", "12345"}, {"2026-07", "67890"}},
+		Duration: 10 * time.Millisecond,
+		RowCount: 2,
+	}
+	var sb strings.Builder
+	if err := output.Print(&sb, r, "json", false); err != nil {
+		t.Fatal(err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, `"periode": "2026-08"`) {
+		t.Errorf("expected periode to remain string '2026-08', got:\n%s", out)
+	}
+	if !strings.Contains(out, `"total_visits": 12345`) {
+		t.Errorf("expected total_visits to be numeric 12345, got:\n%s", out)
+	}
+}
+
+

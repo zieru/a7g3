@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -106,16 +107,12 @@ func coerceValue(s string) any {
 	if s == "NULL" {
 		return nil
 	}
-	// Try integer first (no decimal point, no exponent).
-	if !strings.ContainsAny(s, ".eEn") {
-		var i int64
-		if _, err := fmt.Sscanf(s, "%d", &i); err == nil {
-			return i
-		}
+	// Try integer first (strictly entire string must be integer).
+	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return i
 	}
-	// Try float.
-	var f float64
-	if _, err := fmt.Sscanf(s, "%g", &f); err == nil {
+	// Try float (strictly entire string must be float).
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
 		return f
 	}
 	return s
