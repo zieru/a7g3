@@ -137,13 +137,14 @@ func (s *Server) handleListDatasets(ctx context.Context, request mcp.CallToolReq
 	for alias, p := range aliases {
 		exists := false
 		fmtType := "unknown"
-		if stat, err := os.Stat(p); err == nil {
+		cleanP := filepath.Clean(p)
+		if stat, err := os.Stat(cleanP); err == nil {
 			exists = true
-			if detected, err := cli.DetectFormat(p); err == nil {
+			if detected, err := cli.DetectFormat(cleanP); err == nil {
 				fmtType = string(detected)
 			}
 			if stat.IsDir() {
-				fmtType = "parquet (directory)"
+				fmtType = fmt.Sprintf("%s (directory)", fmtType)
 			}
 		} else {
 			if detected, err := cli.DetectFormat(p); err == nil {

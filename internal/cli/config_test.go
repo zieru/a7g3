@@ -146,3 +146,70 @@ func TestParseArgsWithAlias(t *testing.T) {
 		t.Fatal("expected error for unknown alias, got nil")
 	}
 }
+
+func TestDetectFormatDirectory(t *testing.T) {
+	// Test parquet directory
+	parqDir, err := os.MkdirTemp("", "parq_dir_*")
+	if err != nil {
+		t.Fatalf("mkdir temp: %v", err)
+	}
+	defer os.RemoveAll(parqDir)
+
+	f1, err := os.CreateTemp(parqDir, "part_*.parquet")
+	if err != nil {
+		t.Fatalf("create temp parquet: %v", err)
+	}
+	f1.Close()
+
+	fmtType, err := DetectFormat(parqDir)
+	if err != nil {
+		t.Fatalf("DetectFormat on parquet dir failed: %v", err)
+	}
+	if fmtType != FormatParquet {
+		t.Errorf("expected FormatParquet, got %v", fmtType)
+	}
+
+	// Test CSV directory
+	csvDir, err := os.MkdirTemp("", "csv_dir_*")
+	if err != nil {
+		t.Fatalf("mkdir temp: %v", err)
+	}
+	defer os.RemoveAll(csvDir)
+
+	f2, err := os.CreateTemp(csvDir, "part_*.csv")
+	if err != nil {
+		t.Fatalf("create temp csv: %v", err)
+	}
+	f2.Close()
+
+	fmtTypeCSV, err := DetectFormat(csvDir)
+	if err != nil {
+		t.Fatalf("DetectFormat on csv dir failed: %v", err)
+	}
+	if fmtTypeCSV != FormatCSV {
+		t.Errorf("expected FormatCSV, got %v", fmtTypeCSV)
+	}
+}
+
+func TestParseConfigFile_TrailingSlash(t *testing.T) {
+	content := "parq_folder /path/to/my_folder/\n"
+	tmpFile, err := os.CreateTemp("", ".g3a.config.*")
+	if err != nil {
+		t.Fatalf("create temp config: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("write temp config: %v", err)
+	}
+	tmpFile.Close()
+
+	aliases, err := ParseConfigFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("ParseConfigFile failed: %v", err)
+	}
+
+	if aliases["parq_folder"] != "/path/to/my_folder" {
+		t.Errorf("expected trailing slash trimmed to /path/to/my_folder, got %q", aliases["parq_folder"])
+	}
+}

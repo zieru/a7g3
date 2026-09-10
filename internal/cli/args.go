@@ -126,6 +126,11 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 		} else {
 			return nil, errors.New("--input is required (or specify an alias from ~/.g3a.config)")
 		}
+	} else {
+		// If --input is an alias name, resolve it from config
+		if resolved, err := ResolveTargetOrAlias(a.Input); err == nil {
+			a.Input = resolved
+		}
 	}
 
 	return a, a.validate()
@@ -208,20 +213,41 @@ func DetectFormat(inputPath string) (InputFormat, error) {
 		return FormatParquet, nil
 	}
 
-	stat, err := os.Stat(inputPath)
+	cleanPath := filepath.Clean(inputPath)
+	stat, err := os.Stat(cleanPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot access input %q: %w", inputPath, err)
 	}
 
 	if stat.IsDir() {
+		// Inspect files inside directory to detect format
+		isCSV := false
+		_ = filepath.WalkDir(cleanPath, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if !d.IsDir() {
+				ext := strings.ToLower(filepath.Ext(d.Name()))
+				if ext == ".parquet" || ext == ".parq" {
+					return filepath.SkipAll
+				}
+				if ext == ".csv" || ext == ".tsv" {
+					isCSV = true
+				}
+			}
+			return nil
+		})
+		if isCSV {
+			return FormatCSV, nil
+		}
 		return FormatParquet, nil
 	}
 
-	ext := strings.ToLower(filepath.Ext(inputPath))
+	ext := strings.ToLower(filepath.Ext(cleanPath))
 	switch ext {
 	case ".csv", ".tsv", ".txt":
 		return FormatCSV, nil
-	case ".parquet":
+	case ".parquet", ".parq":
 		return FormatParquet, nil
 	case ".sqlite", ".db", ".sqlite3":
 		return FormatSQLite, nil

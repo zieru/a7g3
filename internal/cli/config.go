@@ -82,6 +82,11 @@ func ParseConfigFile(path string) (map[string]string, error) {
 			if homeDir != "" && (strings.HasPrefix(val, "~/") || strings.HasPrefix(val, "~\\")) {
 				val = filepath.Join(homeDir, val[2:])
 			}
+			if len(val) > 1 && (strings.HasSuffix(val, "/") || strings.HasSuffix(val, "\\")) {
+				if val != "/" && !(len(val) == 3 && val[1] == ':' && (val[2] == '/' || val[2] == '\\')) {
+					val = strings.TrimRight(val, "/\\")
+				}
+			}
 			aliases[key] = val
 		}
 	}

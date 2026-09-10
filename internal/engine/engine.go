@@ -164,18 +164,53 @@ func BuildSource(opts QueryOptions) (string, error) {
 		return buildCSVSource(opts), nil
 	case "parquet":
 		inputPath := opts.InputPath
-		if stat, err := os.Stat(inputPath); err == nil && stat.IsDir() {
-			inputPath = filepath.ToSlash(filepath.Join(inputPath, "*.parquet"))
+		cleanPath := filepath.Clean(inputPath)
+		if stat, err := os.Stat(cleanPath); err == nil && stat.IsDir() {
+			inputPath = resolveParquetDirPattern(cleanPath)
 		} else {
 			inputPath = filepath.ToSlash(inputPath)
 		}
 		escaped := strings.ReplaceAll(inputPath, "'", "''")
-		return fmt.Sprintf("read_parquet('%s', union_by_name=true)", escaped), nil
+		return fmt.Sprintf("read_parquet('%s', union_by_name=true, hive_partitioning=true)", escaped), nil
 	case "sqlite":
 		return buildSQLiteSource(opts), nil
 	default:
 		return "", fmt.Errorf("unknown format: %s", opts.Format)
 	}
+}
+
+// resolveParquetDirPattern inspects a directory and returns the optimal glob pattern for DuckDB read_parquet.
+func resolveParquetDirPattern(dir string) string {
+	cleanDir := strings.TrimRight(filepath.ToSlash(dir), "/")
+
+	hasParquetExt := false
+	hasFiles := false
+
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() {
+			hasFiles = true
+			ext := strings.ToLower(filepath.Ext(d.Name()))
+			if ext == ".parquet" || ext == ".parq" {
+				hasParquetExt = true
+				return filepath.SkipAll
+			}
+		}
+		return nil
+	})
+
+	if hasParquetExt {
+		return cleanDir + "/**/*.parquet"
+	}
+	if hasFiles {
+		// Directory contains partition chunks without .parquet extension (e.g. Spark partition parts)
+		return cleanDir + "/**/*"
+	}
+
+	// Default fallback glob
+	return cleanDir + "/**/*.parquet"
 }
 
 // buildQuery constructs the DuckDB SQL from QueryOptions.
@@ -215,13 +250,21 @@ func buildQuery(opts QueryOptions) (string, error) {
 
 // buildCSVSource constructs a DuckDB read_csv() call with options.
 func buildCSVSource(opts QueryOptions) string {
-	escaped := strings.ReplaceAll(opts.InputPath, "'", "''")
+	inputPath := opts.InputPath
+	cleanPath := filepath.Clean(inputPath)
+	if stat, err := os.Stat(cleanPath); err == nil && stat.IsDir() {
+		inputPath = strings.TrimRight(filepath.ToSlash(cleanPath), "/") + "/**/*.csv"
+	} else {
+		inputPath = filepath.ToSlash(inputPath)
+	}
+	escaped := strings.ReplaceAll(inputPath, "'", "''")
 
 	params := []string{
 		fmt.Sprintf("'%s'", escaped),
 		"auto_detect=true",
 		// Tolerate BOM, non-standard line endings, and encoding quirks.
 		"strict_mode=false",
+		"union_by_name=true",
 	}
 	if opts.NoHeader {
 		params = append(params, "header=false")
