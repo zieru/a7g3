@@ -67,6 +67,40 @@ Diagnostics:
 
 ---
 
+## 🤖 Model Context Protocol (MCP) Server
+
+`g3a` can be used directly by AI agents (e.g. Claude Desktop, Cursor, Antigravity IDE, GoAssistant) via the **Model Context Protocol (MCP)** standard over `stdio` or `sse`:
+
+### Starting MCP Mode
+```bash
+# Stdio mode (standard for local AI agents):
+g3a mcp
+
+# SSE HTTP server mode (for remote agents):
+g3a mcp --transport=sse --addr=:8090
+```
+
+### Registered MCP Tools:
+- **`list_datasets`**: Lists all configured dataset aliases from `.g3a.config`.
+- **`describe_dataset`**: Inspects column names, nullability, and DuckDB data types of any dataset.
+- **`query_analytics`**: Executes structured queries with filtering, aggregations, grouping, sorting, limit, and dynamic pivoting.
+- **`run_sql`**: Runs raw DuckDB SQL directly for complex joins, CTEs, and window functions.
+- **`export_chart_image`**: Runs queries and renders high-resolution PNG image charts directly to disk.
+
+### Claude Desktop / Cursor MCP Configuration (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "g3a": {
+      "command": "C:\\Users\\Grapari_Infomedia\\GolandProjects\\a7g3\\g3a.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+---
+
 ## 💡 Aliases Configuration (`.g3a.config`)
 
 Define aliases for frequently queried datasets in `~/.g3a.config` (Linux/macOS: `/home/<user>/.g3a.config`, Windows: `C:\Users\<user>\.g3a.config`) or `.g3a.config` in your working directory:

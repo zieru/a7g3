@@ -103,6 +103,11 @@ func (e *Engine) Run(ctx context.Context, opts QueryOptions) (*Result, error) {
 		fmt.Fprintf(os.Stderr, "[g3a] SQL:\n%s\n\n", query)
 	}
 
+	return e.QueryRaw(ctx, query)
+}
+
+// QueryRaw executes any raw SQL query directly on DuckDB and returns the result.
+func (e *Engine) QueryRaw(ctx context.Context, query string) (*Result, error) {
 	start := time.Now()
 	sqlRows, err := e.db.QueryContext(ctx, query)
 	if err != nil {
@@ -142,13 +147,21 @@ func (e *Engine) Run(ctx context.Context, opts QueryOptions) (*Result, error) {
 	return result, nil
 }
 
-// buildQuery constructs the DuckDB SQL from QueryOptions.
-func buildQuery(opts QueryOptions) (string, error) {
-	var from string
+// Describe returns the column names and data types for a given data source.
+func (e *Engine) Describe(ctx context.Context, opts QueryOptions) (*Result, error) {
+	from, err := BuildSource(opts)
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf("DESCRIBE SELECT * FROM %s LIMIT 0", from)
+	return e.QueryRaw(ctx, query)
+}
 
+// BuildSource constructs the FROM clause source string (e.g. read_parquet(...), read_csv(...), or sqlite_scan(...)).
+func BuildSource(opts QueryOptions) (string, error) {
 	switch opts.Format {
 	case "csv":
-		from = buildCSVSource(opts)
+		return buildCSVSource(opts), nil
 	case "parquet":
 		inputPath := opts.InputPath
 		if stat, err := os.Stat(inputPath); err == nil && stat.IsDir() {
@@ -157,11 +170,19 @@ func buildQuery(opts QueryOptions) (string, error) {
 			inputPath = filepath.ToSlash(inputPath)
 		}
 		escaped := strings.ReplaceAll(inputPath, "'", "''")
-		from = fmt.Sprintf("read_parquet('%s', union_by_name=true)", escaped)
+		return fmt.Sprintf("read_parquet('%s', union_by_name=true)", escaped), nil
 	case "sqlite":
-		from = buildSQLiteSource(opts)
+		return buildSQLiteSource(opts), nil
 	default:
 		return "", fmt.Errorf("unknown format: %s", opts.Format)
+	}
+}
+
+// buildQuery constructs the DuckDB SQL from QueryOptions.
+func buildQuery(opts QueryOptions) (string, error) {
+	from, err := BuildSource(opts)
+	if err != nil {
+		return "", err
 	}
 
 	var sb strings.Builder

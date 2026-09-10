@@ -123,8 +123,12 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 		wMid := font.MeasureString(faceHeader, midHeaders[i]).Ceil()
 		wSub := font.MeasureString(faceHeader, subHeaders[i]).Ceil()
 		maxW := wTop
-		if wMid > maxW { maxW = wMid }
-		if wSub > maxW { maxW = wSub }
+		if wMid > maxW {
+			maxW = wMid
+		}
+		if wSub > maxW {
+			maxW = wSub
+		}
 		if maxW > colWidths[i] {
 			colWidths[i] = maxW
 		}
@@ -193,9 +197,9 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 		endCol := i - 1
 		spanX := colXOffsets[startCol]
 		spanW := colXOffsets[endCol+1] - spanX
-		
+
 		bgClr := getHeaderColor(topName)
-		
+
 		if midHeaders[startCol] == "" && subHeaders[startCol] == "" && startCol == endCol {
 			// Rowspan full height
 			fillRect(img, spanX, tableY, spanW, headerRowHeight*numHeaderRows, bgClr)
@@ -204,7 +208,7 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 			// Top level
 			fillRect(img, spanX, tableY, spanW, headerRowHeight, bgClr)
 			drawTextCentered(img, faceHeader, topName, spanX, tableY, spanW, headerRowHeight, colorHeaderText)
-			
+
 			// Mid and Sub levels
 			for j := startCol; j <= endCol; {
 				midName := midHeaders[j]
@@ -215,12 +219,12 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 				midEnd := j - 1
 				midSpanX := colXOffsets[midStart]
 				midSpanW := colXOffsets[midEnd+1] - midSpanX
-				
+
 				midBgClr := bgClr
 				if strings.Contains(strings.ToLower(midName), "total") {
 					midBgClr = colorCellTotalCol
 				}
-				
+
 				if subHeaders[midStart] == "" && midStart == midEnd {
 					// Mid spans remaining height
 					remH := headerRowHeight * (numHeaderRows - 1)
@@ -232,18 +236,18 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 					fillRect(img, midSpanX, tableY+headerRowHeight, midSpanW, headerRowHeight, midBgClr)
 					drawHLine(img, midSpanX, tableY+headerRowHeight, midSpanW, colorHeaderBorder)
 					drawTextCentered(img, faceHeader, midName, midSpanX, tableY+headerRowHeight, midSpanW, headerRowHeight, colorHeaderText)
-					
+
 					// Sub level
 					if numHeaderRows == 3 {
 						for k := midStart; k <= midEnd; k++ {
 							subX := colXOffsets[k]
 							subW := colWidths[k]
-							
+
 							subBgClr := bgClr
 							if strings.Contains(strings.ToLower(subHeaders[k]), "total") || strings.Contains(strings.ToLower(midName), "total") {
 								subBgClr = colorCellTotalCol
 							}
-							
+
 							fillRect(img, subX, tableY+headerRowHeight*2, subW, headerRowHeight, subBgClr)
 							drawHLine(img, subX, tableY+headerRowHeight*2, subW, colorHeaderBorder)
 							if k > midStart {
@@ -267,17 +271,19 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 	dataStartY := tableY + (numHeaderRows * headerRowHeight)
 	for r, row := range result.Rows {
 		rowY := dataStartY + (r * rowHeight)
-		
+
 		isGrandTotal := len(row) > 0 && row[0] == "Grand Total"
 		isContByMonth := len(row) > 0 && strings.Contains(row[0], "%Cont")
 		isRegion := len(row) > 0 && !strings.HasPrefix(row[0], " ") && !isGrandTotal && !isContByMonth
-		
+
 		var rowBg color.Color = colorRowBgEven
-		if r%2 == 1 { rowBg = colorRowBgOdd }
-		
+		if r%2 == 1 {
+			rowBg = colorRowBgOdd
+		}
+
 		textColor := colorCellText
 		currFace := faceBody
-		
+
 		if isGrandTotal {
 			rowBg = colorRowTotal
 			textColor = colorHeaderText
@@ -298,7 +304,7 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 		for c := 0; c < numCols; c++ {
 			cx := colXOffsets[c]
 			cw := colWidths[c]
-			
+
 			// Subtotal columns in dark gray
 			if !isGrandTotal && !isContByMonth && !isRegion {
 				if strings.Contains(strings.ToLower(midHeaders[c]), "total") || strings.Contains(strings.ToLower(subHeaders[c]), "total") {
@@ -306,7 +312,9 @@ func DrawTableImage(result *engine.Result) (*image.RGBA, error) {
 					if textColor == colorCellText {
 						// draw text white inside total cols
 						drawTextInCell(img, currFace, formatCellValue(row[c]), cx, rowY, cw, rowHeight, paddingX, isNumericCol[c], colorHeaderText)
-						if c > 0 { drawVLine(img, cx, rowY, rowHeight, colorBorder) }
+						if c > 0 {
+							drawVLine(img, cx, rowY, rowHeight, colorBorder)
+						}
 						continue
 					}
 				}
@@ -378,7 +386,9 @@ func formatCellValue(s string) string {
 }
 
 func isNumeric(s string) bool {
-	if s == "" || s == "NULL" { return false }
+	if s == "" || s == "NULL" {
+		return false
+	}
 	hasDigit := false
 	for _, r := range s {
 		if r >= '0' && r <= '9' {
@@ -391,21 +401,27 @@ func isNumeric(s string) bool {
 }
 
 func drawTextInCell(dst *image.RGBA, f font.Face, text string, x, y, w, h, padX int, alignRight bool, clr color.Color) {
-	if text == "" { return }
+	if text == "" {
+		return
+	}
 	bounds, _ := font.BoundString(f, text)
 	textW := (bounds.Max.X - bounds.Min.X).Ceil()
 	fontHeight := f.Metrics().Ascent.Ceil()
 
 	posY := y + (h+fontHeight)/2 - int(2*(f.Metrics().Descent.Ceil()/3))
 	posX := x + padX
-	if alignRight { posX = x + w - padX - textW }
+	if alignRight {
+		posX = x + w - padX - textW
+	}
 
 	d := &font.Drawer{Dst: dst, Src: image.NewUniform(clr), Face: f, Dot: fixed.Point26_6{X: fixed.I(posX), Y: fixed.I(posY)}}
 	d.DrawString(text)
 }
 
 func drawTextCentered(dst *image.RGBA, f font.Face, text string, x, y, w, h int, clr color.Color) {
-	if text == "" { return }
+	if text == "" {
+		return
+	}
 	bounds, _ := font.BoundString(f, text)
 	textW := (bounds.Max.X - bounds.Min.X).Ceil()
 	fontHeight := f.Metrics().Ascent.Ceil()
@@ -424,8 +440,10 @@ func fillRect(dst *image.RGBA, x, y, w, h int, clr color.Color) {
 func drawHLine(dst *image.RGBA, x, y, w int, clr color.Color) { fillRect(dst, x, y, w, 1, clr) }
 func drawVLine(dst *image.RGBA, x, y, h int, clr color.Color) { fillRect(dst, x, y, 1, h, clr) }
 func drawRectBorder(dst *image.RGBA, x, y, w, h int, clr color.Color) {
-	drawHLine(dst, x, y, w, clr); drawHLine(dst, x, y+h-1, w, clr)
-	drawVLine(dst, x, y, h, clr); drawVLine(dst, x+w-1, y, h, clr)
+	drawHLine(dst, x, y, w, clr)
+	drawHLine(dst, x, y+h-1, w, clr)
+	drawVLine(dst, x, y, h, clr)
+	drawVLine(dst, x+w-1, y, h, clr)
 }
 
 func drawEmptyState(f font.Face, fontScale float64) *image.RGBA {
@@ -438,6 +456,8 @@ func drawEmptyState(f font.Face, fontScale float64) *image.RGBA {
 
 func RenderPNGBytes(result *engine.Result) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := RenderPNG(&buf, result); err != nil { return nil, err }
+	if err := RenderPNG(&buf, result); err != nil {
+		return nil, err
+	}
 	return buf.Bytes(), nil
 }

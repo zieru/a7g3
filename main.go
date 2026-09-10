@@ -14,13 +14,24 @@ import (
 	"strings"
 	"syscall"
 
+	"flag"
 	"github.com/a7g3/g3a/internal/cli"
 	"github.com/a7g3/g3a/internal/engine"
+	"github.com/a7g3/g3a/internal/mcp"
 	"github.com/a7g3/g3a/internal/output"
 	"github.com/a7g3/g3a/internal/pivot"
+	mcpserver "github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "mcp" || os.Args[1] == "--mcp") {
+		if err := runMCP(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "g3a mcp error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	args, parseErr := cli.Parse()
 	if parseErr != nil {
 		fmt.Fprintf(os.Stderr, "g3a: error: %v\n", parseErr)
@@ -30,6 +41,40 @@ func main() {
 	if err := run(args); err != nil {
 		output.PrintError(os.Stderr, err, string(args.Output))
 		os.Exit(1)
+	}
+}
+
+func runMCP(rawArgs []string) error {
+	fs := flag.NewFlagSet("g3a mcp", flag.ExitOnError)
+	transport := fs.String("transport", "stdio", "Transport protocol: stdio (default) or sse")
+	addr := fs.String("addr", ":8090", "Listening address for SSE transport (e.g. :8090 or localhost:8090)")
+	verbose := fs.Bool("verbose", false, "Enable verbose logging to stderr")
+	_ = fs.Parse(rawArgs)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	eng, err := engine.New()
+	if err != nil {
+		return fmt.Errorf("init engine: %w", err)
+	}
+	defer eng.Close()
+
+	srv := mcp.NewServer(eng, *verbose)
+
+	switch strings.ToLower(*transport) {
+	case "sse":
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "[g3a-mcp] Starting SSE server on %s...\n", *addr)
+		}
+		sseServer := mcpserver.NewSSEServer(srv.MCPServer())
+		return sseServer.Start(*addr)
+	default:
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "[g3a-mcp] Starting stdio server...\n")
+		}
+		stdioServer := mcpserver.NewStdioServer(srv.MCPServer())
+		return stdioServer.Listen(ctx, os.Stdin, os.Stdout)
 	}
 }
 

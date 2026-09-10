@@ -118,7 +118,7 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 	if a.Input == "" {
 		if len(posArgs) > 0 {
 			target := posArgs[0]
-			resolved, err := resolveTargetOrAlias(target)
+			resolved, err := ResolveTargetOrAlias(target)
 			if err != nil {
 				return nil, err
 			}
@@ -174,8 +174,8 @@ func splitFlagsAndPositional(args []string) ([]string, []string) {
 	return flagArgs, posArgs
 }
 
-// resolveTargetOrAlias checks whether target is a defined alias in .g3a.config or a direct file path.
-func resolveTargetOrAlias(target string) (string, error) {
+// ResolveTargetOrAlias checks whether target is a defined alias in .g3a.config or a direct file path.
+func ResolveTargetOrAlias(target string) (string, error) {
 	aliases, cfgPath, cfgErr := LoadConfig()
 	if cfgErr != nil {
 		return "", fmt.Errorf("read config file %s: %w", cfgPath, cfgErr)
@@ -196,46 +196,52 @@ func resolveTargetOrAlias(target string) (string, error) {
 	return "", fmt.Errorf("file %q does not exist (no ~/.g3a.config found)", target)
 }
 
+// DetectFormat infers the InputFormat from the target path or directory.
+func DetectFormat(inputPath string) (InputFormat, error) {
+	if strings.ContainsAny(inputPath, "*?") {
+		ext := strings.ToLower(filepath.Ext(inputPath))
+		if ext == ".parquet" || strings.Contains(inputPath, ".parquet") {
+			return FormatParquet, nil
+		} else if ext == ".csv" || strings.Contains(inputPath, ".csv") {
+			return FormatCSV, nil
+		}
+		return FormatParquet, nil
+	}
+
+	stat, err := os.Stat(inputPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot access input %q: %w", inputPath, err)
+	}
+
+	if stat.IsDir() {
+		return FormatParquet, nil
+	}
+
+	ext := strings.ToLower(filepath.Ext(inputPath))
+	switch ext {
+	case ".csv", ".tsv", ".txt":
+		return FormatCSV, nil
+	case ".parquet":
+		return FormatParquet, nil
+	case ".sqlite", ".db", ".sqlite3":
+		return FormatSQLite, nil
+	default:
+		return "", fmt.Errorf("unsupported file extension %q (supported: .csv, .tsv, .parquet, .sqlite, .db)", ext)
+	}
+}
+
 func (a *Args) validate() error {
 	if a.Input == "" {
 		return errors.New("--input is required")
 	}
 
-	// If input contains wildcards (* or ?), handle as glob pattern
-	if strings.ContainsAny(a.Input, "*?") {
-		ext := strings.ToLower(filepath.Ext(a.Input))
-		if ext == ".parquet" || strings.Contains(a.Input, ".parquet") {
-			a.Format = FormatParquet
-		} else if ext == ".csv" || strings.Contains(a.Input, ".csv") {
-			a.Format = FormatCSV
-		} else {
-			a.Format = FormatParquet
-		}
-	} else {
-		stat, err := os.Stat(a.Input)
-		if err != nil {
-			return fmt.Errorf("cannot access input file or directory %q: %w", a.Input, err)
-		}
-
-		if stat.IsDir() {
-			// If input is a directory, default to Parquet directory scanning
-			a.Format = FormatParquet
-		} else {
-			ext := strings.ToLower(filepath.Ext(a.Input))
-			switch ext {
-			case ".csv", ".tsv", ".txt":
-				a.Format = FormatCSV
-				if a.Delimiter == "" && ext == ".tsv" {
-					a.Delimiter = "\t"
-				}
-			case ".parquet":
-				a.Format = FormatParquet
-			case ".sqlite", ".db", ".sqlite3":
-				a.Format = FormatSQLite
-			default:
-				return fmt.Errorf("unsupported file extension %q (supported: .csv, .tsv, .parquet, .sqlite, .db)", ext)
-			}
-		}
+	fmtType, err := DetectFormat(a.Input)
+	if err != nil {
+		return err
+	}
+	a.Format = fmtType
+	if a.Format == FormatCSV && strings.ToLower(filepath.Ext(a.Input)) == ".tsv" && a.Delimiter == "" {
+		a.Delimiter = "\t"
 	}
 
 	switch a.Output {
