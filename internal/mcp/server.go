@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/a7g3/g3a/internal/cli"
 	"github.com/a7g3/g3a/internal/engine"
@@ -107,7 +108,7 @@ func (s *Server) registerTools() {
 			"export_chart_image",
 			mcp.WithDescription("Execute query, format pivot if needed, and render high-resolution PNG image file directly"),
 			mcp.WithString("dataset", mcp.Required(), mcp.Description("Dataset alias or file path")),
-			mcp.WithString("out_file", mcp.Required(), mcp.Description("Destination PNG file path (e.g. 'chart.png')")),
+			mcp.WithString("out_file", mcp.Description("Optional destination PNG file path (e.g. '/tmp/chart.png'). If omitted, a temporary file is automatically created.")),
 			mcp.WithString("select", mcp.Description("SQL SELECT expressions (default '*')")),
 			mcp.WithString("where", mcp.Description("SQL WHERE clause filter expressions")),
 			mcp.WithString("group_by", mcp.Description("SQL GROUP BY column(s)")),
@@ -328,9 +329,15 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 	if err != nil {
 		return mcp.NewToolResultError("dataset parameter is required"), nil
 	}
-	outFile, err := request.RequireString("out_file")
-	if err != nil {
-		return mcp.NewToolResultError("out_file parameter is required"), nil
+	outFile := request.GetString("out_file", "")
+	if strings.TrimSpace(outFile) == "" {
+		cleanDataset := strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+				return r
+			}
+			return '_'
+		}, dataset)
+		outFile = filepath.Join(os.TempDir(), fmt.Sprintf("%s_chart_%d.png", cleanDataset, time.Now().UnixMilli()))
 	}
 	sel := request.GetString("select", "*")
 	if sel == "" {
@@ -418,5 +425,6 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 		"message":     fmt.Sprintf("Successfully generated chart image at %s (%d rows)", outFile, res.RowCount),
 	}
 	b, _ := json.MarshalIndent(resp, "", "  ")
-	return mcp.NewToolResultText(string(b)), nil
+	outMsg := fmt.Sprintf("[ATTACH_FILE:%s|CAPTION:Visualisasi Data %s]\n%s", outFile, dataset, string(b))
+	return mcp.NewToolResultText(outMsg), nil
 }
