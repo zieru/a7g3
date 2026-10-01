@@ -54,9 +54,11 @@ func candidateConfigPaths() []string {
 
 // ParseConfigFile parses a .g3a.config file and returns alias -> filepath mapping.
 // Supported line formats:
-//   funneling /path/to/file.csv
-//   funneling = /path/to/file.parquet
-//   funnelingx "C:\Path With Spaces\file.csv"
+//
+//	funneling /path/to/file.csv
+//	funneling = /path/to/file.parquet
+//	funnelingx "C:\Path With Spaces\file.csv"
+//
 // Lines starting with #, ;, or // are ignored as comments.
 func ParseConfigFile(path string) (map[string]string, error) {
 	file, err := os.Open(path)

@@ -35,24 +35,24 @@ const (
 
 // Args holds all parsed CLI arguments.
 type Args struct {
-	Input      string
-	Format     InputFormat
-	Select     string
-	GroupBy    string
-	Where      string
-	OrderBy    string
-	Limit      int
-	Output     OutputFormat
-	OutFile    string // Output file path (e.g. report.png or data.csv)
-	ChunkSize  int
-	NoHeader   bool
-	Delimiter  string
-	Table      string // SQLite table name override
-	Verbose    bool
+	Input     string
+	Format    InputFormat
+	Select    string
+	GroupBy   string
+	Where     string
+	OrderBy   string
+	Limit     int
+	Output    OutputFormat
+	OutFile   string // Output file path (e.g. report.png or data.csv)
+	ChunkSize int
+	NoHeader  bool
+	Delimiter string
+	Table     string // SQLite table name override
+	Verbose   bool
 	// Pivot options
-	Pivot      string // comma-separated column names to pivot on
-	PivotFill  string // fill value for missing combos (default "0")
-	PivotSep   string // separator for multi-column pivot headers (default "/")
+	Pivot     string // comma-separated column names to pivot on
+	PivotFill string // fill value for missing combos (default "0")
+	PivotSep  string // separator for multi-column pivot headers (default "/")
 }
 
 // Parse parses os.Args and returns validated Args.

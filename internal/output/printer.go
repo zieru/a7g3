@@ -15,13 +15,13 @@ import (
 // JSONOutput is the structured JSON envelope for LLM tool use.
 // All fields are always present so parsers don't need null checks.
 type JSONOutput struct {
-	OK       bool              `json:"ok"`
-	Columns  []string          `json:"columns"`
-	Rows     []map[string]any  `json:"rows"`
-	RowCount int               `json:"row_count"`
-	DurationMs float64         `json:"duration_ms"`
-	SQL      string            `json:"sql,omitempty"`
-	Error    string            `json:"error,omitempty"`
+	OK         bool             `json:"ok"`
+	Columns    []string         `json:"columns"`
+	Rows       []map[string]any `json:"rows"`
+	RowCount   int              `json:"row_count"`
+	DurationMs float64          `json:"duration_ms"`
+	SQL        string           `json:"sql,omitempty"`
+	Error      string           `json:"error,omitempty"`
 }
 
 // JSONError is the structured error envelope emitted when output=json and an error occurs.
@@ -252,8 +252,6 @@ func isTOONBare(s string) bool {
 	}
 	return i == len(s)
 }
-
-
 
 func printJSONL(w io.Writer, result *engine.Result) error {
 	// First line: metadata header

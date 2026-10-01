@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -166,6 +167,14 @@ func BuildSource(opts QueryOptions) (string, error) {
 		inputPath := opts.InputPath
 		cleanPath := filepath.Clean(inputPath)
 		if stat, err := os.Stat(cleanPath); err == nil && stat.IsDir() {
+			files := collectParquetFiles(cleanPath)
+			if len(files) > 0 {
+				var quotedFiles []string
+				for _, f := range files {
+					quotedFiles = append(quotedFiles, fmt.Sprintf("'%s'", strings.ReplaceAll(filepath.ToSlash(f), "'", "''")))
+				}
+				return fmt.Sprintf("read_parquet([%s], union_by_name=true, hive_partitioning=true)", strings.Join(quotedFiles, ", ")), nil
+			}
 			inputPath = resolveParquetDirPattern(cleanPath)
 		} else {
 			inputPath = filepath.ToSlash(inputPath)
@@ -177,6 +186,87 @@ func BuildSource(opts QueryOptions) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown format: %s", opts.Format)
 	}
+}
+
+// isIgnoredFile checks if a file is a backup, temporary, or hidden file that should be excluded from directory scans.
+func isIgnoredFile(name string) bool {
+	lower := strings.ToLower(name)
+	if strings.HasPrefix(lower, ".") || strings.HasPrefix(lower, "~") {
+		return true
+	}
+	ignoredSubstrings := []string{
+		"safebackup",
+		".bak",
+		".backup",
+		" - copy",
+		"_copy",
+		" - salinan",
+		"_salinan",
+		".tmp",
+		".temp",
+		"_old",
+		"conflict",
+	}
+	for _, sub := range ignoredSubstrings {
+		if strings.Contains(lower, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// collectParquetFiles scans dir recursively and returns all valid, non-ignored parquet files sorted.
+func collectParquetFiles(dir string) []string {
+	var files []string
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		name := d.Name()
+		if isIgnoredFile(name) {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		if ext == ".parquet" || ext == ".parq" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	sort.Strings(files)
+	return files
+}
+
+// collectCSVFiles scans dir recursively and returns all valid, non-ignored CSV files sorted.
+func collectCSVFiles(dir string) []string {
+	var files []string
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		name := d.Name()
+		if isIgnoredFile(name) {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		if ext == ".csv" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	sort.Strings(files)
+	return files
 }
 
 // resolveParquetDirPattern inspects a directory and returns the optimal glob pattern for DuckDB read_parquet.
@@ -252,15 +342,26 @@ func buildQuery(opts QueryOptions) (string, error) {
 func buildCSVSource(opts QueryOptions) string {
 	inputPath := opts.InputPath
 	cleanPath := filepath.Clean(inputPath)
+	var sourceParam string
 	if stat, err := os.Stat(cleanPath); err == nil && stat.IsDir() {
-		inputPath = strings.TrimRight(filepath.ToSlash(cleanPath), "/") + "/**/*.csv"
+		files := collectCSVFiles(cleanPath)
+		if len(files) > 0 {
+			var quotedFiles []string
+			for _, f := range files {
+				quotedFiles = append(quotedFiles, fmt.Sprintf("'%s'", strings.ReplaceAll(filepath.ToSlash(f), "'", "''")))
+			}
+			sourceParam = fmt.Sprintf("[%s]", strings.Join(quotedFiles, ", "))
+		} else {
+			escaped := strings.ReplaceAll(strings.TrimRight(filepath.ToSlash(cleanPath), "/")+"/**/*.csv", "'", "''")
+			sourceParam = fmt.Sprintf("'%s'", escaped)
+		}
 	} else {
-		inputPath = filepath.ToSlash(inputPath)
+		escaped := strings.ReplaceAll(filepath.ToSlash(inputPath), "'", "''")
+		sourceParam = fmt.Sprintf("'%s'", escaped)
 	}
-	escaped := strings.ReplaceAll(inputPath, "'", "''")
 
 	params := []string{
-		fmt.Sprintf("'%s'", escaped),
+		sourceParam,
 		"auto_detect=true",
 		// Tolerate BOM, non-standard line endings, and encoding quirks.
 		"strict_mode=false",

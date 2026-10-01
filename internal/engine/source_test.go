@@ -21,6 +21,12 @@ func TestBuildSourceParquetDir(t *testing.T) {
 	}
 	f1.Close()
 
+	// Create a safeBackup file which must be excluded
+	backupFile := filepath.Join(tmpDir, "data_092026-4116131e1245-safeBackup-0001.parquet")
+	if err := os.WriteFile(backupFile, []byte("dummy"), 0644); err != nil {
+		t.Fatalf("create backup parquet: %v", err)
+	}
+
 	source, err := BuildSource(QueryOptions{
 		InputPath: tmpDir,
 		Format:    "parquet",
@@ -29,10 +35,13 @@ func TestBuildSourceParquetDir(t *testing.T) {
 		t.Fatalf("BuildSource failed: %v", err)
 	}
 
-	cleanDir := strings.TrimRight(filepath.ToSlash(tmpDir), "/")
-	expectedPattern := cleanDir + "/**/*.parquet"
-	if !strings.Contains(source, expectedPattern) {
-		t.Errorf("expected source to contain %q, got %q", expectedPattern, source)
+	expectedFile := filepath.ToSlash(f1.Name())
+	if !strings.Contains(source, expectedFile) {
+		t.Errorf("expected source to contain %q, got %q", expectedFile, source)
+	}
+	backupFileName := filepath.ToSlash(backupFile)
+	if strings.Contains(source, backupFileName) {
+		t.Errorf("expected source to EXCLUDE backup file %q, but got %q", backupFileName, source)
 	}
 	if !strings.Contains(source, "union_by_name=true") {
 		t.Errorf("expected union_by_name=true in %q", source)
@@ -81,6 +90,11 @@ func TestBuildSourceCSVDir(t *testing.T) {
 	}
 	f1.Close()
 
+	backupCSV := filepath.Join(tmpDir, "data_backup.tmp.csv")
+	if err := os.WriteFile(backupCSV, []byte("dummy"), 0644); err != nil {
+		t.Fatalf("create backup csv: %v", err)
+	}
+
 	source, err := BuildSource(QueryOptions{
 		InputPath: tmpDir,
 		Format:    "csv",
@@ -89,10 +103,12 @@ func TestBuildSourceCSVDir(t *testing.T) {
 		t.Fatalf("BuildSource failed: %v", err)
 	}
 
-	cleanDir := strings.TrimRight(filepath.ToSlash(tmpDir), "/")
-	expectedPattern := cleanDir + "/**/*.csv"
-	if !strings.Contains(source, expectedPattern) {
-		t.Errorf("expected source to contain %q, got %q", expectedPattern, source)
+	expectedFile := filepath.ToSlash(f1.Name())
+	if !strings.Contains(source, expectedFile) {
+		t.Errorf("expected source to contain %q, got %q", expectedFile, source)
+	}
+	if strings.Contains(source, "backup.tmp") {
+		t.Errorf("expected source to EXCLUDE backup csv, got %q", source)
 	}
 	if !strings.Contains(source, "union_by_name=true") {
 		t.Errorf("expected union_by_name=true in %q", source)

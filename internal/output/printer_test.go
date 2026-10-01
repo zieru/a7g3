@@ -113,5 +113,3 @@ func TestPrintJSON_DateStringsPreserved(t *testing.T) {
 		t.Errorf("expected total_visits to be numeric 12345, got:\n%s", out)
 	}
 }
-
-
