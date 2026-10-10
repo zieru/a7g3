@@ -17,6 +17,7 @@ import (
 	"flag"
 	"github.com/a7g3/g3a/internal/cli"
 	"github.com/a7g3/g3a/internal/engine"
+	"github.com/a7g3/g3a/internal/grapari"
 	"github.com/a7g3/g3a/internal/mcp"
 	"github.com/a7g3/g3a/internal/output"
 	"github.com/a7g3/g3a/internal/pivot"
@@ -60,7 +61,48 @@ func runMCP(rawArgs []string) error {
 	}
 	defer eng.Close()
 
-	srv := mcp.NewServer(eng, *verbose)
+	// Load configuration for GraPARI knowledge base
+	cfgAliases, _, _ := cli.LoadConfig()
+	grapariSource := os.Getenv("G3A_GRAPARI_SOURCE")
+	if grapariSource == "" {
+		if val, ok := cfgAliases["grapari_source"]; ok {
+			grapariSource = val
+		} else {
+			grapariSource = "data/grapari_knowledge.csv"
+		}
+	}
+	vectorURL := os.Getenv("G3A_VECTOR_URL")
+	if vectorURL == "" {
+		if val, ok := cfgAliases["grapari_vector_url"]; ok {
+			vectorURL = val
+		}
+	}
+	modelName := os.Getenv("G3A_EMBEDDING_MODEL")
+	if modelName == "" {
+		if val, ok := cfgAliases["grapari_model"]; ok {
+			modelName = val
+		} else {
+			modelName = "gemini-embedding-2"
+		}
+	}
+
+	syncer := grapari.NewSyncer(grapari.Config{
+		SourcePath: grapariSource,
+		StatePath:  ".grapari_sync_state.json",
+		VectorURL:  vectorURL,
+		ModelName:  modelName,
+	})
+
+	// Initial sync and load
+	if _, _, _, err := syncer.Sync(ctx, false); err != nil && *verbose {
+		fmt.Fprintf(os.Stderr, "[grapari] initial sync info: %v\n", err)
+	}
+
+	// Initialize and start background file watcher
+	watcher := grapari.NewWatcher(grapariSource, syncer, *verbose)
+	watcher.Start(ctx)
+
+	srv := mcp.NewServer(eng, syncer, watcher, *verbose)
 
 	switch strings.ToLower(*transport) {
 	case "sse":

@@ -13,23 +13,28 @@ import (
 
 	"github.com/a7g3/g3a/internal/cli"
 	"github.com/a7g3/g3a/internal/engine"
+	"github.com/a7g3/g3a/internal/grapari"
 	"github.com/a7g3/g3a/internal/output"
 	"github.com/a7g3/g3a/internal/pivot"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// Server wraps the mark3labs MCP Server and DuckDB engine.
+// Server wraps the mark3labs MCP Server, DuckDB engine, and GraPARI knowledge system.
 type Server struct {
 	mcpServer *server.MCPServer
 	eng       *engine.Engine
+	syncer    *grapari.Syncer
+	watcher   *grapari.Watcher
 	verbose   bool
 }
 
-// NewServer initializes a new g3a MCP Server instance with registered analytical tools.
-func NewServer(eng *engine.Engine, verbose bool) *Server {
+// NewServer initializes a new g3a MCP Server instance with registered analytical and GraPARI knowledge tools.
+func NewServer(eng *engine.Engine, syncer *grapari.Syncer, watcher *grapari.Watcher, verbose bool) *Server {
 	s := &Server{
 		eng:     eng,
+		syncer:  syncer,
+		watcher: watcher,
 		verbose: verbose,
 	}
 
@@ -119,6 +124,37 @@ func (s *Server) registerTools() {
 			mcp.WithString("pivot_sep", mcp.Description("Header separator for multi-column pivot keys (default '/')")),
 		),
 		s.handleExportChartImage,
+	)
+
+	// 6. search_grapari_knowledge
+	s.mcpServer.AddTool(
+		mcp.NewTool(
+			"search_grapari_knowledge",
+			mcp.WithDescription("Cari referensi SOP GraPARI, link spreadsheet/form, petunjuk MSISDN, dan email PIC/CC secara ringkas dan hemat token"),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Kata kunci atau pertanyaan (misal: 'referral orbit', 'user raisa', 'psb kendala', 'goodie bag')")),
+			mcp.WithString("category", mcp.Description("Filter opsional berdasarkan kategori (misal: 'User Management', 'Orbit & NTE', 'Kindi (Halo A1)')")),
+			mcp.WithNumber("limit", mcp.Description("Jumlah task maksimal yang dikembalikan (default: 3)")),
+		),
+		s.handleSearchGrapariKnowledge,
+	)
+
+	// 7. trigger_grapari_sync
+	s.mcpServer.AddTool(
+		mcp.NewTool(
+			"trigger_grapari_sync",
+			mcp.WithDescription("Jalankan sinkronisasi bertahap (incremental sync) dari spreadsheet/CSV GraPARI ke goaiassistant vector engine"),
+			mcp.WithBoolean("force_all", mcp.Description("Set true untuk embed ulang seluruh baris tanpa melihat cache hash")),
+		),
+		s.handleTriggerGrapariSync,
+	)
+
+	// 8. grapari_sync_status
+	s.mcpServer.AddTool(
+		mcp.NewTool(
+			"grapari_sync_status",
+			mcp.WithDescription("Lihat ringkasan status knowledge base GraPARI: jumlah task, kategori yang aktif, dan waktu sync terakhir"),
+		),
+		s.handleGrapariSyncStatus,
 	)
 }
 
@@ -428,3 +464,72 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 	outMsg := fmt.Sprintf("[ATTACH_FILE:%s|CAPTION:Visualisasi Data %s]\n%s", outFile, dataset, string(b))
 	return mcp.NewToolResultText(outMsg), nil
 }
+
+func (s *Server) handleSearchGrapariKnowledge(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.syncer == nil {
+		return mcp.NewToolResultError("GraPARI knowledge syncer is not configured"), nil
+	}
+
+	query, err := request.RequireString("query")
+	if err != nil {
+		return mcp.NewToolResultError("query parameter is required"), nil
+	}
+	category := request.GetString("category", "")
+	limit := request.GetInt("limit", 3)
+
+	results := s.syncer.Search(query, category, limit)
+	if len(results) == 0 {
+		return mcp.NewToolResultText(fmt.Sprintf("Tidak ditemukan SOP GraPARI yang sesuai dengan query: %q", query)), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Ditemukan %d referensi SOP GraPARI:\n\n", len(results)))
+	for i, r := range results {
+		sb.WriteString(fmt.Sprintf("%d. %s\n\n", i+1, r.AnswerText))
+	}
+
+	return mcp.NewToolResultText(strings.TrimSpace(sb.String())), nil
+}
+
+func (s *Server) handleTriggerGrapariSync(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.syncer == nil {
+		return mcp.NewToolResultError("GraPARI knowledge syncer is not configured"), nil
+	}
+
+	forceAll := request.GetBool("force_all", false)
+	inserted, updated, deleted, err := s.syncer.Sync(ctx, forceAll)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("sync error: %v", err)), nil
+	}
+
+	resp := map[string]any{
+		"ok":       true,
+		"inserted": inserted,
+		"updated":  updated,
+		"deleted":  deleted,
+		"message":  fmt.Sprintf("Sinkronisasi berhasil: +%d baru, ~%d diperbarui, -%d dihapus", inserted, updated, deleted),
+	}
+	b, _ := json.MarshalIndent(resp, "", "  ")
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleGrapariSyncStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.syncer == nil {
+		return mcp.NewToolResultError("GraPARI knowledge syncer is not configured"), nil
+	}
+
+	tasks := s.syncer.GetTasks()
+	categories := make(map[string]int)
+	for _, t := range tasks {
+		categories[t.Category]++
+	}
+
+	resp := map[string]any{
+		"total_tasks": len(tasks),
+		"categories":  categories,
+		"status":      "active",
+	}
+	b, _ := json.MarshalIndent(resp, "", "  ")
+	return mcp.NewToolResultText(string(b)), nil
+}
+
