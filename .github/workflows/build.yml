@@ -77,6 +77,7 @@ jobs:
   build-windows:
     name: Build (windows-amd64)
     needs: [build-linux]
+    if: ${{ !contains(github.ref_name, '-linux') }}
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -107,7 +108,7 @@ jobs:
   # ── Release ─────────────────────────────────────────────────────────
   release:
     name: Create GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && always() && needs.build-linux.result == 'success' && (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped')
     needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:

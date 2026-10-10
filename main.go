@@ -25,6 +25,15 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--restart" || os.Args[1] == "restart") {
+		remainingArgs := os.Args[2:]
+		if err := cli.RestartSelf(remainingArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "g3a restart error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) > 1 && (os.Args[1] == "mcp" || os.Args[1] == "--mcp") {
 		if err := runMCP(os.Args[2:]); err != nil {
 			fmt.Fprintf(os.Stderr, "g3a mcp error: %v\n", err)

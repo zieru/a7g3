@@ -156,6 +156,15 @@ func (s *Server) registerTools() {
 		),
 		s.handleGrapariSyncStatus,
 	)
+
+	// 9. restart_service
+	s.mcpServer.AddTool(
+		mcp.NewTool(
+			"restart_service",
+			mcp.WithDescription("Restart g3a MCP service secara graceful agar memuat binary atau konfigurasi baru"),
+		),
+		s.handleRestartService,
+	)
 }
 
 func (s *Server) handleListDatasets(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -532,4 +541,19 @@ func (s *Server) handleGrapariSyncStatus(ctx context.Context, request mcp.CallTo
 	b, _ := json.MarshalIndent(resp, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil
 }
+
+func (s *Server) handleRestartService(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		_ = cli.RestartSelf([]string{"mcp"})
+	}()
+
+	resp := map[string]any{
+		"ok":      true,
+		"message": "Sinyal restart telah dikirim. Service g3a akan dimuat ulang dalam beberapa saat.",
+	}
+	b, _ := json.MarshalIndent(resp, "", "  ")
+	return mcp.NewToolResultText(string(b)), nil
+}
+
 
