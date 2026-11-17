@@ -70,9 +70,10 @@ func (s *Server) registerTools() {
 		mcp.NewTool(
 			"describe_dataset",
 			mcp.WithDescription("Inspect the schema (column names and data types) of a dataset or file"),
-			mcp.WithString("dataset", mcp.Required(), mcp.Description("Dataset alias (e.g. 'funneling') or file path (.parquet, .csv, .sqlite)")),
+			mcp.WithString("dataset", mcp.Required(), mcp.Description("Dataset alias (e.g. 'funneling') or file path (.parquet, .csv, .sqlite, .xlsx)")),
 			mcp.WithString("delimiter", mcp.Description("Optional CSV delimiter (e.g. ',' or ';')")),
 			mcp.WithString("table", mcp.Description("Optional SQLite table name")),
+			mcp.WithString("sheet", mcp.Description("Optional Excel worksheet name")),
 		),
 		s.handleDescribeDataset,
 	)
@@ -81,13 +82,14 @@ func (s *Server) registerTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(
 			"query_analytics",
-			mcp.WithDescription("Execute analytical query on Parquet/CSV/SQLite with DuckDB (filtering, aggregations, grouping, sorting, limit, and dynamic pivoting)"),
+			mcp.WithDescription("Execute analytical query on Parquet/CSV/SQLite/Excel with DuckDB (filtering, aggregations, grouping, sorting, limit, and dynamic pivoting)"),
 			mcp.WithString("dataset", mcp.Required(), mcp.Description("Dataset alias (e.g. 'funneling', 'visit') or path to file/directory")),
 			mcp.WithString("select", mcp.Description("SQL SELECT expressions (default '*')")),
 			mcp.WithString("where", mcp.Description("SQL WHERE clause filter expressions")),
 			mcp.WithString("group_by", mcp.Description("SQL GROUP BY column(s)")),
 			mcp.WithString("order_by", mcp.Description("SQL ORDER BY expressions")),
 			mcp.WithNumber("limit", mcp.Description("Maximum rows to return (default: 50, 0 for unlimited)")),
+			mcp.WithString("sheet", mcp.Description("Optional Excel worksheet name")),
 			mcp.WithString("pivot", mcp.Description("Optional column(s) to pivot into headers (e.g. 'flag_dilayani' or 'regional,service')")),
 			mcp.WithString("pivot_fill", mcp.Description("Default fill value for empty cells in pivot matrix (default '0')")),
 			mcp.WithString("pivot_sep", mcp.Description("Header separator for multi-column pivot keys (default '/')")),
@@ -119,6 +121,7 @@ func (s *Server) registerTools() {
 			mcp.WithString("group_by", mcp.Description("SQL GROUP BY column(s)")),
 			mcp.WithString("order_by", mcp.Description("SQL ORDER BY expressions")),
 			mcp.WithNumber("limit", mcp.Description("Maximum rows to return (default: 50, 0 for unlimited)")),
+			mcp.WithString("sheet", mcp.Description("Optional Excel worksheet name")),
 			mcp.WithString("pivot", mcp.Description("Optional column(s) to pivot into headers")),
 			mcp.WithString("pivot_fill", mcp.Description("Default fill value for empty cells (default '0')")),
 			mcp.WithString("pivot_sep", mcp.Description("Header separator for multi-column pivot keys (default '/')")),
@@ -222,6 +225,7 @@ func (s *Server) handleDescribeDataset(ctx context.Context, request mcp.CallTool
 	}
 	delimiter := request.GetString("delimiter", "")
 	table := request.GetString("table", "")
+	sheet := request.GetString("sheet", "")
 
 	resolvedPath, err := cli.ResolveTargetOrAlias(dataset)
 	if err != nil {
@@ -246,11 +250,18 @@ func (s *Server) handleDescribeDataset(ctx context.Context, request mcp.CallTool
 		}
 	}
 
+	if fmtType == cli.FormatExcel {
+		if err := s.eng.InstallExcel(ctx); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("install excel: %v", err)), nil
+		}
+	}
+
 	opts := engine.QueryOptions{
 		InputPath: resolvedPath,
 		Format:    string(fmtType),
 		Delimiter: delimiter,
 		Table:     table,
+		Sheet:     sheet,
 		Verbose:   s.verbose,
 	}
 
@@ -280,6 +291,7 @@ func (s *Server) handleQueryAnalytics(ctx context.Context, request mcp.CallToolR
 	groupBy := request.GetString("group_by", "")
 	orderBy := request.GetString("order_by", "")
 	limit := request.GetInt("limit", 50)
+	sheet := request.GetString("sheet", "")
 	pivotCol := request.GetString("pivot", "")
 	pivotFill := request.GetString("pivot_fill", "0")
 	pivotSep := request.GetString("pivot_sep", "/")
@@ -307,6 +319,12 @@ func (s *Server) handleQueryAnalytics(ctx context.Context, request mcp.CallToolR
 		table = t
 	}
 
+	if fmtType == cli.FormatExcel {
+		if err := s.eng.InstallExcel(ctx); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("install excel: %v", err)), nil
+		}
+	}
+
 	opts := engine.QueryOptions{
 		InputPath: resolvedPath,
 		Format:    string(fmtType),
@@ -316,6 +334,7 @@ func (s *Server) handleQueryAnalytics(ctx context.Context, request mcp.CallToolR
 		OrderBy:   orderBy,
 		Limit:     limit,
 		Table:     table,
+		Sheet:     sheet,
 		Verbose:   s.verbose,
 	}
 
@@ -392,6 +411,7 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 	groupBy := request.GetString("group_by", "")
 	orderBy := request.GetString("order_by", "")
 	limit := request.GetInt("limit", 50)
+	sheet := request.GetString("sheet", "")
 	pivotCol := request.GetString("pivot", "")
 	pivotFill := request.GetString("pivot_fill", "0")
 	pivotSep := request.GetString("pivot_sep", "/")
@@ -418,6 +438,12 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 		table = t
 	}
 
+	if fmtType == cli.FormatExcel {
+		if err := s.eng.InstallExcel(ctx); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("install excel: %v", err)), nil
+		}
+	}
+
 	opts := engine.QueryOptions{
 		InputPath: resolvedPath,
 		Format:    string(fmtType),
@@ -427,6 +453,7 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 		OrderBy:   orderBy,
 		Limit:     limit,
 		Table:     table,
+		Sheet:     sheet,
 		Verbose:   s.verbose,
 	}
 
@@ -555,5 +582,3 @@ func (s *Server) handleRestartService(ctx context.Context, request mcp.CallToolR
 	b, _ := json.MarshalIndent(resp, "", "  ")
 	return mcp.NewToolResultText(string(b)), nil
 }
-
-

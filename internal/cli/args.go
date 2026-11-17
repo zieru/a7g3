@@ -18,6 +18,7 @@ const (
 	FormatCSV     InputFormat = "csv"
 	FormatParquet InputFormat = "parquet"
 	FormatSQLite  InputFormat = "sqlite"
+	FormatExcel   InputFormat = "excel"
 )
 
 // OutputFormat represents how results are printed.
@@ -48,6 +49,7 @@ type Args struct {
 	NoHeader  bool
 	Delimiter string
 	Table     string // SQLite table name override
+	Sheet     string // Excel worksheet name override
 	Verbose   bool
 	// Pivot options
 	Pivot     string // comma-separated column names to pivot on
@@ -67,7 +69,7 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 	fs := flag.NewFlagSet("g3a", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // prevent automatic printing on error
 
-	fs.StringVar(&a.Input, "input", "", "Input file path (.csv, .parquet, .sqlite/.db)")
+	fs.StringVar(&a.Input, "input", "", "Input file path (.csv, .parquet, .sqlite/.db, .xlsx)")
 	fs.StringVar(&a.Select, "select", "*", "SELECT expressions (e.g. \"count(1) as n, sum(amount) as total\")")
 	fs.StringVar(&a.GroupBy, "group-by", "", "GROUP BY columns (comma-separated)")
 	fs.StringVar(&a.Where, "where", "", "WHERE clause (e.g. \"amount > 100\")")
@@ -77,9 +79,10 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 	fs.StringVar(&a.OutFile, "out-file", "", "Output file path (e.g. table.png or out.csv)")
 	fs.StringVar(&a.OutFile, "out", "", "Alias for --out-file")
 	fs.IntVar(&a.ChunkSize, "chunk-size", 100_000, "Rows per chunk for CSV/Parquet streaming")
-	fs.BoolVar(&a.NoHeader, "no-header", false, "Input CSV has no header row")
+	fs.BoolVar(&a.NoHeader, "no-header", false, "Input CSV/Excel has no header row")
 	fs.StringVar(&a.Delimiter, "delimiter", "", "CSV delimiter character (auto-detect if empty)")
 	fs.StringVar(&a.Table, "table", "", "SQLite table name (auto-detect if empty)")
+	fs.StringVar(&a.Sheet, "sheet", "", "Excel worksheet name (first sheet if empty)")
 	fs.BoolVar(&a.Verbose, "verbose", false, "Print verbose/debug output")
 	fs.StringVar(&a.Pivot, "pivot", "", "Comma-separated column name(s) to pivot into headers (e.g. month OR year,month)")
 	fs.StringVar(&a.PivotFill, "pivot-fill", "0", "Fill value for missing pivot combinations")
@@ -154,6 +157,7 @@ func splitFlagsAndPositional(args []string) ([]string, []string) {
 		"chunk-size": true,
 		"delimiter":  true,
 		"table":      true,
+		"sheet":      true,
 		"pivot":      true,
 		"pivot-fill": true,
 		"pivot-sep":  true,
@@ -251,8 +255,10 @@ func DetectFormat(inputPath string) (InputFormat, error) {
 		return FormatParquet, nil
 	case ".sqlite", ".db", ".sqlite3":
 		return FormatSQLite, nil
+	case ".xlsx":
+		return FormatExcel, nil
 	default:
-		return "", fmt.Errorf("unsupported file extension %q (supported: .csv, .tsv, .parquet, .sqlite, .db)", ext)
+		return "", fmt.Errorf("unsupported file extension %q (supported: .csv, .tsv, .parquet, .sqlite, .db, .xlsx)", ext)
 	}
 }
 
@@ -305,7 +311,7 @@ Options:
 `)
 	fs := flag.NewFlagSet("g3a", flag.ContinueOnError)
 	dummy := &Args{}
-	fs.StringVar(&dummy.Input, "input", "", "Input file path (.csv, .parquet, .sqlite/.db)")
+	fs.StringVar(&dummy.Input, "input", "", "Input file path (.csv, .parquet, .sqlite/.db, .xlsx)")
 	fs.StringVar(&dummy.Select, "select", "*", "SELECT expressions (e.g. \"count(1) as n, sum(amount) as total\")")
 	fs.StringVar(&dummy.GroupBy, "group-by", "", "GROUP BY columns (comma-separated)")
 	fs.StringVar(&dummy.Where, "where", "", "WHERE clause (e.g. \"amount > 100\")")
@@ -313,9 +319,10 @@ Options:
 	fs.IntVar(&dummy.Limit, "limit", 0, "Limit number of result rows (0 = no limit)")
 	fs.StringVar((*string)(&dummy.Output), "output", "table", "Output format: table, csv, json, jsonl, toon (toon=token-efficient for LLM, jsonl=streaming JSON Lines)")
 	fs.IntVar(&dummy.ChunkSize, "chunk-size", 100_000, "Rows per chunk for CSV/Parquet streaming")
-	fs.BoolVar(&dummy.NoHeader, "no-header", false, "Input CSV has no header row")
+	fs.BoolVar(&dummy.NoHeader, "no-header", false, "Input CSV/Excel has no header row")
 	fs.StringVar(&dummy.Delimiter, "delimiter", "", "CSV delimiter character (auto-detect if empty)")
 	fs.StringVar(&dummy.Table, "table", "", "SQLite table name (auto-detect if empty)")
+	fs.StringVar(&dummy.Sheet, "sheet", "", "Excel worksheet name (first sheet if empty)")
 	fs.BoolVar(&dummy.Verbose, "verbose", false, "Print verbose/debug output")
 	fs.StringVar(&dummy.Pivot, "pivot", "", "Comma-separated column name(s) to pivot into headers (e.g. month OR year,month)")
 	fs.StringVar(&dummy.PivotFill, "pivot-fill", "0", "Fill value for missing pivot combinations")

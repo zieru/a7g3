@@ -1,13 +1,13 @@
 # g3a — High-Performance CLI Analytics & Query Engine
 
-**g3a** is a blazingly fast, BigQuery-style command-line query tool and analytics engine for local and networked files (Parquet, CSV, TSV, SQLite), powered by DuckDB's vectorized columnar execution.
+**g3a** is a blazingly fast, BigQuery-style command-line query tool and analytics engine for local and networked files (Parquet, CSV, TSV, SQLite, Excel `.xlsx`), powered by DuckDB's vectorized columnar execution.
 
 ---
 
 ## 🚀 Key Features
 
 - **Vectorized Columnar Execution**: Powered by embedded DuckDB for ultra-fast aggregations, joins, and window functions.
-- **Multiple File Formats**: Native support for **Parquet** (single files or directories), **CSV/TSV**, and **SQLite**.
+- **Multiple File Formats**: Native support for **Parquet** (single files or directories), **CSV/TSV**, **SQLite**, and **Excel (`.xlsx`)**.
 - **In-Memory Dynamic Pivoting**: Transform tabular metrics into multi-column pivot matrices on-the-fly (`--pivot`).
 - **Rich Output Formats**:
   - `json`: Structured typed JSON envelope with duration and metadata (optimized for REST APIs and dashboards).
@@ -41,7 +41,7 @@ Usage:
   g3a --input=FILE [options]
 
 Core Query Options:
-  --input        Input file or directory (.parquet, .csv, .tsv, .sqlite, .db)
+  --input        Input file or directory (.parquet, .csv, .tsv, .sqlite, .db, .xlsx)
   --select       SELECT SQL expressions (default: "*")
   --where        WHERE SQL filter clause
   --group-by     GROUP BY columns (comma-separated or SQL expressions)
@@ -52,9 +52,10 @@ Output & Formatting:
   --output       Output format: table (default), json, csv, jsonl, toon, png, image
   --out-file     Save output directly to file (e.g. report.json, chart.png)
   --chunk-size   Streaming buffer size (default: 100,000 rows)
-  --no-header    Input CSV does not contain a header row
+  --no-header    Input CSV/Excel does not contain a header row
   --delimiter    Custom CSV delimiter (auto-detected if omitted)
   --table        SQLite table name override
+  --sheet        Excel worksheet name override (first sheet if omitted)
 
 Pivot Engine:
   --pivot        Column(s) to rotate into headers (e.g. "flag_dilayani" or "regional,service")

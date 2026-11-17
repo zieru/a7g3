@@ -114,3 +114,38 @@ func TestBuildSourceCSVDir(t *testing.T) {
 		t.Errorf("expected union_by_name=true in %q", source)
 	}
 }
+
+func TestBuildSourceExcel(t *testing.T) {
+	source, err := BuildSource(QueryOptions{
+		InputPath: "data/report.xlsx",
+		Format:    "excel",
+	})
+	if err != nil {
+		t.Fatalf("BuildSource excel failed: %v", err)
+	}
+	if !strings.Contains(source, "read_xlsx('data/report.xlsx'") {
+		t.Errorf("expected read_xlsx('data/report.xlsx', ...), got %q", source)
+	}
+	if !strings.Contains(source, "header=true") {
+		t.Errorf("expected header=true, got %q", source)
+	}
+
+	sourceSheet, err := BuildSource(QueryOptions{
+		InputPath: "data/it's_report.xlsx",
+		Format:    "excel",
+		Sheet:     "Sales '26",
+		NoHeader:  true,
+	})
+	if err != nil {
+		t.Fatalf("BuildSource excel with sheet failed: %v", err)
+	}
+	if !strings.Contains(sourceSheet, "read_xlsx('data/it''s_report.xlsx'") {
+		t.Errorf("expected escaped path in %q", sourceSheet)
+	}
+	if !strings.Contains(sourceSheet, "sheet='Sales ''26'") {
+		t.Errorf("expected escaped sheet in %q", sourceSheet)
+	}
+	if !strings.Contains(sourceSheet, "header=false") {
+		t.Errorf("expected header=false in %q", sourceSheet)
+	}
+}

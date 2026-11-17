@@ -155,6 +155,12 @@ func run(args *cli.Args) error {
 		}
 	}
 
+	if args.Format == cli.FormatExcel {
+		if err := eng.InstallExcel(ctx); err != nil {
+			return fmt.Errorf("install excel extension: %w", err)
+		}
+	}
+
 	opts := engine.QueryOptions{
 		InputPath: args.Input,
 		Format:    strings.ToLower(string(args.Format)),
@@ -167,6 +173,7 @@ func run(args *cli.Args) error {
 		NoHeader:  args.NoHeader,
 		Delimiter: args.Delimiter,
 		Table:     args.Table,
+		Sheet:     args.Sheet,
 		Verbose:   args.Verbose,
 	}
 

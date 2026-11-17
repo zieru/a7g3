@@ -52,6 +52,17 @@ func (e *Engine) InstallSQLite(ctx context.Context) error {
 	return nil
 }
 
+// InstallExcel installs and loads the DuckDB excel extension.
+func (e *Engine) InstallExcel(ctx context.Context) error {
+	if err := e.exec(ctx, "INSTALL excel"); err != nil {
+		return fmt.Errorf("install excel extension: %w", err)
+	}
+	if err := e.exec(ctx, "LOAD excel"); err != nil {
+		return fmt.Errorf("load excel extension: %w", err)
+	}
+	return nil
+}
+
 // DetectSQLiteTable returns the first non-system table name from the SQLite file.
 func (e *Engine) DetectSQLiteTable(ctx context.Context, path string) (string, error) {
 	escaped := strings.ReplaceAll(path, "'", "''")
@@ -71,7 +82,7 @@ func (e *Engine) DetectSQLiteTable(ctx context.Context, path string) (string, er
 // QueryOptions holds all query parameters.
 type QueryOptions struct {
 	InputPath string
-	Format    string // "csv" | "parquet" | "sqlite"
+	Format    string // "csv" | "parquet" | "sqlite" | "excel"
 	Select    string
 	GroupBy   string
 	Where     string
@@ -81,6 +92,7 @@ type QueryOptions struct {
 	NoHeader  bool
 	Delimiter string
 	Table     string // SQLite table override
+	Sheet     string // Excel worksheet name override
 	Verbose   bool
 }
 
@@ -183,6 +195,8 @@ func BuildSource(opts QueryOptions) (string, error) {
 		return fmt.Sprintf("read_parquet('%s', union_by_name=true, hive_partitioning=true)", escaped), nil
 	case "sqlite":
 		return buildSQLiteSource(opts), nil
+	case "excel":
+		return buildExcelSource(opts), nil
 	default:
 		return "", fmt.Errorf("unknown format: %s", opts.Format)
 	}
@@ -389,6 +403,22 @@ func buildSQLiteSource(opts QueryOptions) string {
 	}
 	tableEscaped := strings.ReplaceAll(table, "'", "''")
 	return fmt.Sprintf("sqlite_scan('%s', '%s')", escaped, tableEscaped)
+}
+
+// buildExcelSource returns a DuckDB read_xlsx() table function call.
+func buildExcelSource(opts QueryOptions) string {
+	escaped := strings.ReplaceAll(filepath.ToSlash(opts.InputPath), "'", "''")
+	params := []string{fmt.Sprintf("'%s'", escaped)}
+	if opts.Sheet != "" {
+		sheetEsc := strings.ReplaceAll(opts.Sheet, "'", "''")
+		params = append(params, fmt.Sprintf("sheet='%s'", sheetEsc))
+	}
+	if opts.NoHeader {
+		params = append(params, "header=false")
+	} else {
+		params = append(params, "header=true")
+	}
+	return fmt.Sprintf("read_xlsx(%s)", strings.Join(params, ", "))
 }
 
 // valueToString converts a sql.Scan value to a display string.
