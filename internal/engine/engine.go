@@ -81,19 +81,20 @@ func (e *Engine) DetectSQLiteTable(ctx context.Context, path string) (string, er
 
 // QueryOptions holds all query parameters.
 type QueryOptions struct {
-	InputPath string
-	Format    string // "csv" | "parquet" | "sqlite" | "excel"
-	Select    string
-	GroupBy   string
-	Where     string
-	OrderBy   string
-	Limit     int
-	ChunkSize int
-	NoHeader  bool
-	Delimiter string
-	Table     string // SQLite table override
-	Sheet     string // Excel worksheet name override
-	Verbose   bool
+	InputPath  string
+	Format     string // "csv" | "parquet" | "sqlite" | "excel"
+	Select     string
+	GroupBy    string
+	Where      string
+	OrderBy    string
+	Limit      int
+	ChunkSize  int
+	NoHeader   bool
+	Delimiter  string
+	Table      string // SQLite table override
+	Sheet      string // Excel worksheet name override
+	AllVarchar bool   // Force all columns to be read as VARCHAR
+	Verbose    bool
 }
 
 // Result holds query output.
@@ -391,6 +392,9 @@ func buildCSVSource(opts QueryOptions) string {
 	if opts.ChunkSize > 0 {
 		params = append(params, fmt.Sprintf("buffer_size=%d", opts.ChunkSize))
 	}
+	if opts.AllVarchar {
+		params = append(params, "all_varchar=true")
+	}
 	return fmt.Sprintf("read_csv(%s)", strings.Join(params, ", "))
 }
 
@@ -417,6 +421,9 @@ func buildExcelSource(opts QueryOptions) string {
 		params = append(params, "header=false")
 	} else {
 		params = append(params, "header=true")
+	}
+	if opts.AllVarchar {
+		params = append(params, "all_varchar=true")
 	}
 	return fmt.Sprintf("read_xlsx(%s)", strings.Join(params, ", "))
 }

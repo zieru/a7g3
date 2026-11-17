@@ -131,10 +131,11 @@ func TestBuildSourceExcel(t *testing.T) {
 	}
 
 	sourceSheet, err := BuildSource(QueryOptions{
-		InputPath: "data/it's_report.xlsx",
-		Format:    "excel",
-		Sheet:     "Sales '26",
-		NoHeader:  true,
+		InputPath:  "data/it's_report.xlsx",
+		Format:     "excel",
+		Sheet:      "Sales '26",
+		NoHeader:   true,
+		AllVarchar: true,
 	})
 	if err != nil {
 		t.Fatalf("BuildSource excel with sheet failed: %v", err)
@@ -147,5 +148,8 @@ func TestBuildSourceExcel(t *testing.T) {
 	}
 	if !strings.Contains(sourceSheet, "header=false") {
 		t.Errorf("expected header=false in %q", sourceSheet)
+	}
+	if !strings.Contains(sourceSheet, "all_varchar=true") {
+		t.Errorf("expected all_varchar=true in %q", sourceSheet)
 	}
 }

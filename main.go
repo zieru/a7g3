@@ -162,19 +162,20 @@ func run(args *cli.Args) error {
 	}
 
 	opts := engine.QueryOptions{
-		InputPath: args.Input,
-		Format:    strings.ToLower(string(args.Format)),
-		Select:    args.Select,
-		GroupBy:   args.GroupBy,
-		Where:     args.Where,
-		OrderBy:   args.OrderBy,
-		Limit:     args.Limit,
-		ChunkSize: args.ChunkSize,
-		NoHeader:  args.NoHeader,
-		Delimiter: args.Delimiter,
-		Table:     args.Table,
-		Sheet:     args.Sheet,
-		Verbose:   args.Verbose,
+		InputPath:  args.Input,
+		Format:     strings.ToLower(string(args.Format)),
+		Select:     args.Select,
+		GroupBy:    args.GroupBy,
+		Where:      args.Where,
+		OrderBy:    args.OrderBy,
+		Limit:      args.Limit,
+		ChunkSize:  args.ChunkSize,
+		NoHeader:   args.NoHeader,
+		Delimiter:  args.Delimiter,
+		Table:      args.Table,
+		Sheet:      args.Sheet,
+		AllVarchar: args.AllVarchar,
+		Verbose:    args.Verbose,
 	}
 
 	result, err := eng.Run(ctx, opts)

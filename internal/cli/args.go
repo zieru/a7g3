@@ -36,21 +36,22 @@ const (
 
 // Args holds all parsed CLI arguments.
 type Args struct {
-	Input     string
-	Format    InputFormat
-	Select    string
-	GroupBy   string
-	Where     string
-	OrderBy   string
-	Limit     int
-	Output    OutputFormat
-	OutFile   string // Output file path (e.g. report.png or data.csv)
-	ChunkSize int
-	NoHeader  bool
-	Delimiter string
-	Table     string // SQLite table name override
-	Sheet     string // Excel worksheet name override
-	Verbose   bool
+	Input      string
+	Format     InputFormat
+	Select     string
+	GroupBy    string
+	Where      string
+	OrderBy    string
+	Limit      int
+	Output     OutputFormat
+	OutFile    string // Output file path (e.g. report.png or data.csv)
+	ChunkSize  int
+	NoHeader   bool
+	Delimiter  string
+	Table      string // SQLite table name override
+	Sheet      string // Excel worksheet name override
+	AllVarchar bool   // Force all columns to be read as VARCHAR (text)
+	Verbose    bool
 	// Pivot options
 	Pivot     string // comma-separated column names to pivot on
 	PivotFill string // fill value for missing combos (default "0")
@@ -83,6 +84,7 @@ func ParseArgs(rawArgs []string) (*Args, error) {
 	fs.StringVar(&a.Delimiter, "delimiter", "", "CSV delimiter character (auto-detect if empty)")
 	fs.StringVar(&a.Table, "table", "", "SQLite table name (auto-detect if empty)")
 	fs.StringVar(&a.Sheet, "sheet", "", "Excel worksheet name (first sheet if empty)")
+	fs.BoolVar(&a.AllVarchar, "all-varchar", false, "Read all columns as text (VARCHAR) to avoid mixed-type parse errors")
 	fs.BoolVar(&a.Verbose, "verbose", false, "Print verbose/debug output")
 	fs.StringVar(&a.Pivot, "pivot", "", "Comma-separated column name(s) to pivot into headers (e.g. month OR year,month)")
 	fs.StringVar(&a.PivotFill, "pivot-fill", "0", "Fill value for missing pivot combinations")
@@ -323,6 +325,7 @@ Options:
 	fs.StringVar(&dummy.Delimiter, "delimiter", "", "CSV delimiter character (auto-detect if empty)")
 	fs.StringVar(&dummy.Table, "table", "", "SQLite table name (auto-detect if empty)")
 	fs.StringVar(&dummy.Sheet, "sheet", "", "Excel worksheet name (first sheet if empty)")
+	fs.BoolVar(&dummy.AllVarchar, "all-varchar", false, "Read all columns as text (VARCHAR) to avoid mixed-type parse errors")
 	fs.BoolVar(&dummy.Verbose, "verbose", false, "Print verbose/debug output")
 	fs.StringVar(&dummy.Pivot, "pivot", "", "Comma-separated column name(s) to pivot into headers (e.g. month OR year,month)")
 	fs.StringVar(&dummy.PivotFill, "pivot-fill", "0", "Fill value for missing pivot combinations")

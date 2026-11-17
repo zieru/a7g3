@@ -74,6 +74,7 @@ func (s *Server) registerTools() {
 			mcp.WithString("delimiter", mcp.Description("Optional CSV delimiter (e.g. ',' or ';')")),
 			mcp.WithString("table", mcp.Description("Optional SQLite table name")),
 			mcp.WithString("sheet", mcp.Description("Optional Excel worksheet name")),
+			mcp.WithBoolean("all_varchar", mcp.Description("Force reading all columns as text (VARCHAR) to avoid mixed-type parse errors")),
 		),
 		s.handleDescribeDataset,
 	)
@@ -90,6 +91,7 @@ func (s *Server) registerTools() {
 			mcp.WithString("order_by", mcp.Description("SQL ORDER BY expressions")),
 			mcp.WithNumber("limit", mcp.Description("Maximum rows to return (default: 50, 0 for unlimited)")),
 			mcp.WithString("sheet", mcp.Description("Optional Excel worksheet name")),
+			mcp.WithBoolean("all_varchar", mcp.Description("Force reading all columns as text (VARCHAR) to avoid mixed-type parse errors")),
 			mcp.WithString("pivot", mcp.Description("Optional column(s) to pivot into headers (e.g. 'flag_dilayani' or 'regional,service')")),
 			mcp.WithString("pivot_fill", mcp.Description("Default fill value for empty cells in pivot matrix (default '0')")),
 			mcp.WithString("pivot_sep", mcp.Description("Header separator for multi-column pivot keys (default '/')")),
@@ -122,6 +124,7 @@ func (s *Server) registerTools() {
 			mcp.WithString("order_by", mcp.Description("SQL ORDER BY expressions")),
 			mcp.WithNumber("limit", mcp.Description("Maximum rows to return (default: 50, 0 for unlimited)")),
 			mcp.WithString("sheet", mcp.Description("Optional Excel worksheet name")),
+			mcp.WithBoolean("all_varchar", mcp.Description("Force reading all columns as text (VARCHAR) to avoid mixed-type parse errors")),
 			mcp.WithString("pivot", mcp.Description("Optional column(s) to pivot into headers")),
 			mcp.WithString("pivot_fill", mcp.Description("Default fill value for empty cells (default '0')")),
 			mcp.WithString("pivot_sep", mcp.Description("Header separator for multi-column pivot keys (default '/')")),
@@ -226,6 +229,7 @@ func (s *Server) handleDescribeDataset(ctx context.Context, request mcp.CallTool
 	delimiter := request.GetString("delimiter", "")
 	table := request.GetString("table", "")
 	sheet := request.GetString("sheet", "")
+	allVarchar := request.GetBool("all_varchar", false)
 
 	resolvedPath, err := cli.ResolveTargetOrAlias(dataset)
 	if err != nil {
@@ -257,12 +261,13 @@ func (s *Server) handleDescribeDataset(ctx context.Context, request mcp.CallTool
 	}
 
 	opts := engine.QueryOptions{
-		InputPath: resolvedPath,
-		Format:    string(fmtType),
-		Delimiter: delimiter,
-		Table:     table,
-		Sheet:     sheet,
-		Verbose:   s.verbose,
+		InputPath:  resolvedPath,
+		Format:     string(fmtType),
+		Delimiter:  delimiter,
+		Table:      table,
+		Sheet:      sheet,
+		AllVarchar: allVarchar,
+		Verbose:    s.verbose,
 	}
 
 	res, err := s.eng.Describe(ctx, opts)
@@ -292,6 +297,7 @@ func (s *Server) handleQueryAnalytics(ctx context.Context, request mcp.CallToolR
 	orderBy := request.GetString("order_by", "")
 	limit := request.GetInt("limit", 50)
 	sheet := request.GetString("sheet", "")
+	allVarchar := request.GetBool("all_varchar", false)
 	pivotCol := request.GetString("pivot", "")
 	pivotFill := request.GetString("pivot_fill", "0")
 	pivotSep := request.GetString("pivot_sep", "/")
@@ -326,16 +332,17 @@ func (s *Server) handleQueryAnalytics(ctx context.Context, request mcp.CallToolR
 	}
 
 	opts := engine.QueryOptions{
-		InputPath: resolvedPath,
-		Format:    string(fmtType),
-		Select:    sel,
-		Where:     where,
-		GroupBy:   groupBy,
-		OrderBy:   orderBy,
-		Limit:     limit,
-		Table:     table,
-		Sheet:     sheet,
-		Verbose:   s.verbose,
+		InputPath:  resolvedPath,
+		Format:     string(fmtType),
+		Select:     sel,
+		Where:      where,
+		GroupBy:    groupBy,
+		OrderBy:    orderBy,
+		Limit:      limit,
+		Table:      table,
+		Sheet:      sheet,
+		AllVarchar: allVarchar,
+		Verbose:    s.verbose,
 	}
 
 	res, err := s.eng.Run(ctx, opts)
@@ -412,6 +419,7 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 	orderBy := request.GetString("order_by", "")
 	limit := request.GetInt("limit", 50)
 	sheet := request.GetString("sheet", "")
+	allVarchar := request.GetBool("all_varchar", false)
 	pivotCol := request.GetString("pivot", "")
 	pivotFill := request.GetString("pivot_fill", "0")
 	pivotSep := request.GetString("pivot_sep", "/")
@@ -445,16 +453,17 @@ func (s *Server) handleExportChartImage(ctx context.Context, request mcp.CallToo
 	}
 
 	opts := engine.QueryOptions{
-		InputPath: resolvedPath,
-		Format:    string(fmtType),
-		Select:    sel,
-		Where:     where,
-		GroupBy:   groupBy,
-		OrderBy:   orderBy,
-		Limit:     limit,
-		Table:     table,
-		Sheet:     sheet,
-		Verbose:   s.verbose,
+		InputPath:  resolvedPath,
+		Format:     string(fmtType),
+		Select:     sel,
+		Where:      where,
+		GroupBy:    groupBy,
+		OrderBy:    orderBy,
+		Limit:      limit,
+		Table:      table,
+		Sheet:      sheet,
+		AllVarchar: allVarchar,
+		Verbose:    s.verbose,
 	}
 
 	res, err := s.eng.Run(ctx, opts)

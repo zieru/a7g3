@@ -56,6 +56,7 @@ Output & Formatting:
   --delimiter    Custom CSV delimiter (auto-detected if omitted)
   --table        SQLite table name override
   --sheet        Excel worksheet name override (first sheet if omitted)
+  --all-varchar  Force reading all columns as text (VARCHAR) to avoid mixed-type parse errors
 
 Pivot Engine:
   --pivot        Column(s) to rotate into headers (e.g. "flag_dilayani" or "regional,service")

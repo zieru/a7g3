@@ -21,7 +21,7 @@ func TestDetectFormatExcel(t *testing.T) {
 		t.Errorf("expected %q, got %q", FormatExcel, got)
 	}
 
-	args, err := ParseArgs([]string{xlsxPath, "--sheet", "Summary", "--no-header"})
+	args, err := ParseArgs([]string{xlsxPath, "--sheet", "Summary", "--no-header", "--all-varchar"})
 	if err != nil {
 		t.Fatalf("ParseArgs failed: %v", err)
 	}
@@ -33,5 +33,8 @@ func TestDetectFormatExcel(t *testing.T) {
 	}
 	if !args.NoHeader {
 		t.Errorf("expected NoHeader=true")
+	}
+	if !args.AllVarchar {
+		t.Errorf("expected AllVarchar=true")
 	}
 }
